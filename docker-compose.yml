@@ -1,0 +1,75 @@
+version: '3.8'
+
+services:
+  # Database PostgreSQL untuk Checkpointer State Machine & Task History
+  postgres-db:
+    image: postgres:16-alpine
+    container_name: agentic-postgres
+    environment:
+      POSTGRES_DB: agentic_db
+      POSTGRES_USER: ${DATABASE_USER:-postgres}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-postgres}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Redis untuk Session Memory & Event Broker Realtime
+  redis-cache:
+    image: redis:7-alpine
+    container_name: agentic-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  # Backend Orchestrator (Spring Boot + Spring AI + LangChain4j)
+  orchestrator:
+    build:
+      context: ./orchestrator-service
+      dockerfile: Dockerfile
+    container_name: agentic-orchestrator
+    environment:
+      DATABASE_URL: jdbc:postgresql://postgres-db:5432/agentic_db
+      DATABASE_USER: ${DATABASE_USER:-postgres}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD:-postgres}
+      REDIS_HOST: redis-cache
+      REDIS_PORT: 6379
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID}
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres-db:
+        condition: service_healthy
+      redis-cache:
+        condition: service_started
+    volumes:
+      # Mount workspace agar kode yang digenerate tersinkronisasi ke host lokal
+      - ./workspace:/app/workspace
+      - ./docs:/app/docs
+      - ./tasks:/app/tasks
+
+  # Frontend Dashboard UI (Next.js Mobile-Friendly)
+  dashboard:
+    build:
+      context: ./dashboard-ui
+      dockerfile: Dockerfile
+    container_name: agentic-dashboard
+    environment:
+      NEXT_PUBLIC_ORCHESTRATOR_API_URL: http://localhost:8080
+      NEXT_PUBLIC_WS_URL: ws://localhost:8080/ws/agent-events
+    ports:
+      - "3000:3000"
+    depends_on:
+      - orchestrator
+
+volumes:
+  postgres_data:
+  redis_data:

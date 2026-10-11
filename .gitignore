@@ -1,0 +1,26 @@
+# =============================================
+# Ignor list folder kerja & output build
+# =============================================
+/workspace/*
+/vscode/*
+/orchestrator-service/target/*
+/dashboard-ui/node_modules/*
+
+# =============================================
+# Logs and temp files
+# =============================================
+*.log
+*.tmp
+*.temp
+
+# =============================================
+# Ignore all node_modules directories
+# =============================================
+node_modules/
+.next/
+
+# =============================================
+# Ignore agent-related files
+# =============================================
+.agent
+.vscode

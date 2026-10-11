@@ -1,0 +1,28 @@
+server:
+  port: 0
+
+spring:
+  application:
+    name: agentic-orchestrator-test
+  datasource:
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;MODE=PostgreSQL
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: 
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+
+agentic:
+  model:
+    provider: mock
+    api-key: test-key
+  workflow:
+    max-review-loops: 3
+    min-test-coverage: 70
+  notification:
+    telegram:
+      bot-token: ""
+      chat-id: ""

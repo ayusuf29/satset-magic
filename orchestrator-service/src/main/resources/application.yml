@@ -1,0 +1,26 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: agentic-orchestrator-service
+  datasource:
+    url: ${DATABASE_URL:jdbc:h2:mem:agentic_db;DB_CLOSE_DELAY=-1;MODE=PostgreSQL}
+    username: ${DATABASE_USER:sa}
+    password: ${DATABASE_PASSWORD:}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+
+agentic:
+  model:
+    provider: gemini
+    api-key: ${GEMINI_API_KEY:}
+  workflow:
+    max-review-loops: 3
+    min-test-coverage: 70
+  notification:
+    telegram:
+      bot-token: ${TELEGRAM_BOT_TOKEN:}
+      chat-id: ${TELEGRAM_CHAT_ID:}

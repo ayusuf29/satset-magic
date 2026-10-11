@@ -1,0 +1,10 @@
+{
+  "engine": "google-gemini",
+  "defaultModel": "gemini-2.5-flash",
+  "reasoningModel": "gemini-2.0-pro",
+  "reviewCycleMaxLimit": 3,
+  "minimumTestCoveragePercent": 70,
+  "humanInTheLoopEnabled": true,
+  "workspaceDirectory": "./workspace",
+  "rulesFile": "./docs/system-grounding-rules.md"
+}
