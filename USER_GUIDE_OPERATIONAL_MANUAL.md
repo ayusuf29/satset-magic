@@ -44,18 +44,61 @@ Stack container yang otomatis berjalan:
 
 ## 3. Peta Siklus 10 Fase SDLC & Tindakan Manusia
 
-| Fase | Nama Fase | Apa yang Dilakukan Agen | Tindakan yang Wajib Dilakukan Manusia (User) |
+| Fase | Nama Fase | Keterlibatan Deep Council (Shared Enabling) | Tindakan yang Wajib Dilakukan Manusia (User) |
 | :---: | :--- | :--- | :--- |
-| **0** | **Requirement Discovery** | Menganalisis ide mentah di `docs/RAW_INPUT.md`, menyusun user stories dan acceptance criteria format Gherkin di `docs/REQUIREMENT.md`. | **[GERBANG MANUSIA 1]**: Tinjau hasil kurasi kebutuhan. Klik **"Setujui & Lanjutkan"** jika sudah sesuai, atau isi catatan revisi lalu klik **"Tolak"**. |
-| **1** | **Architecture & Design** | Merancang diagram C4, ERD database, schema DDL, dan Architectural Decision Record (ADR) di `workspace/architecture/`. | Memantau diagram via dashboard. Sistem otomatis melangkah jika spesifikasi arsitektur lengkap. |
-| **2** | **Backlog Generation** | Memecah arsitektur menjadi daftar backlog terukur (*Sprint Backlog*) lengkap dengan estimasi poin di `workspace/backlog/`. | Memeriksa estimasi beban kerja bila diperlukan. |
+| **0** | **Requirement Discovery** | **AppSec + Architect**: Review threat surface & domain boundary awal di `workspace/projects/{projectId}/council-audits/phase0-threat-model.md`. | **[GERBANG MANUSIA 1]**: Tinjau hasil kurasi kebutuhan & audit threat surface. Klik **"Setujui & Lanjutkan"** jika sudah sesuai, atau isi catatan revisi lalu klik **"Tolak"**. |
+| **1** | **Architecture & Design** | **System Architect**: C4 Component diagram, state machine checkpointer, & ADR. **AppSec**: STRIDE Threat Model. **Perf**: SLA latency budget. | Memantau diagram via dashboard. Sistem otomatis melangkah jika spesifikasi arsitektur lengkap. |
+| **2** | **Backlog Generation** | **Enabling Team**: Menyelipkan acceptance criteria teknis (misal: OWASP token validation, database indexing) ke setiap task backlog. | Memeriksa estimasi beban kerja bila diperlukan. |
 | **3** | **Task Dispatching** | Mengalokasikan tugas implementasi secara paralel ke worker agent (Backend, Frontend, QA). | Memantau pembagian beban di kartu 5-Team Topology. |
-| **4** | **TDD Planning** | Menyusun skenario pengujian unit & integrasi terlebih dahulu (*Test-First Discipline*) dengan target coverage $\ge 70\%$. | Tidak ada tindakan manual (otomatis oleh TDD Orchestrator). |
-| **5** | **Development** | Menulis kode logika bisnis, REST controller, dan antarmuka komponen UI. | Mengamati progress commit dan live telemetry terminal. |
-| **6** | **Code Review Consortium** | Melakukan audit statis (SAST), cek kebocoran secret, dan verifikasi clean architecture. | **[GERBANG KONDISIONAL - DEADLOCK]**: Jika perbaikan kode gagal 3x berturut-turut, sistem memicu **DEADLOCK**. Anda wajib memilih: Override (*Loloskan*) atau kembalikan ke Dev dengan arahan baru. |
+| **4** | **TDD Planning** | **TDD Orchestrator + Security**: Memastikan test suite mencakup security test (negative test, role bypass test) sebelum penulisan kode. | Tidak ada tindakan manual (otomatis oleh TDD Orchestrator). |
+| **5** | **Development** | Menulis kode logika bisnis, REST controller, dan antarmuka komponen UI sesuai aturan arsitektur & secure coding. | Mengamati progress commit dan live telemetry terminal. |
+| **6** | **Code Review Consortium** | **TRIAD COUNCIL VOTING GATE**: Konsensus wajib 3 pilar: $Consortium = Architect \land Security \land Performance$ plus Coverage $\ge 70\%$. | **[GERBANG MANUSIA 2 - CODE REVIEW & MERGE TO MAIN]**: Branch `main` diproteksi penuh dari bot otonom. Setelah Triad Council memberikan konsensus 3/3 PASS, pimpinan teknis (manusia) wajib memverifikasi dan memberikan otorisasi penggabungan PR ke `main` (via Dashboard atau tombol inline Telegram). Serta **[GERBANG DEADLOCK]** jika perbaikan gagal 3x berturut-turut. |
 | **7** | **QA E2E Verification** | Menjalankan suite pengujian end-to-end sandbox. | Memverifikasi bug report (harus 0 blocker). |
-| **8** | **Pre-Production Gate (DAST/MAST)** | Menjalankan DAST (OWASP ZAP), stress test k6 (P95 $< 200\text{ms}$), dan audit keamanan client mobile (MAST). | **[GERBANG MANUSIA 2 - RELEASE GATE]**: Tinjau laporan verifikasi di `workspace/qa/PRE_PROD_VERIFICATION.md`. Berikan otorisasi rilis produksi. |
-| **9** | **Released (Live Production)** | Menyelesaikan siklus rilis dan mengarsipkan audit trail. | Fitur resmi aktif dan siap dikonsumsi pengguna akhir! |
+| **8** | **Pre-Production Gate (DAST/MAST)** | **DAST/Pentest Scout**: Dynamic fuzzing OWASP ZAP, stress test k6 (P95 $< 200\text{ms}$), dan audit keamanan client mobile (MAST). | **[GERBANG MANUSIA 3 - RELEASE GATE]**: Tinjau laporan verifikasi di `workspace/projects/{projectId}/qa/PRE_PROD_VERIFICATION.md`. Berikan otorisasi rilis produksi. |
+| **9** | **Released (Live Production)** | Menyelesaikan siklus rilis dan mengarsipkan audit trail terisolasi. | Fitur resmi aktif dan siap dikonsumsi pengguna akhir! |
+
+---
+
+## 3.1 Cara Memastikan Council & Shared Enabling Terlibat Mendalam (Bahkan untuk Requirement Sederhana)
+
+Banyak tim terjebak pada ilusi *"Requirement sederhana tidak butuh arsitek atau security"*. Contoh kasus inventory sederhana:
+> *"Buatkan sistem inventory: stock, barang masuk, barang keluar, barang keluar darurat. Semua perlu approval user level lebih tinggi."*
+
+Meskipun terdengar sederhana, **risiko bisnis dan keamanannya sangat tinggi**:
+1. **Security Risk**: Apakah user biasa dapat mem-bypass approval dan melakukan transaksi "barang keluar darurat"? (OWASP A01: Broken Access Control).
+2. **Architecture Risk**: Apakah transaksi stok konkuren rentan terhadap race-condition (misal: dua user mengeluarkan barang sisa 1 secara bersamaan)? Apakah state machine approval tercatat secara idempotent?
+3. **Performance Risk**: Apakah ledger tabel mutasi stok memiliki index yang tepat saat transaksi mencapai puluhan ribu record?
+
+### Checklist Tindakan Operator Manusia:
+1. **Di Fase 0 (Sebelum Sign-off Kebutuhan)**:
+   - Jangan langsung klik *"Setujui"*. Buka dashboard dan periksa tab arsitektur & security.
+   - Pastikan agent PO telah memasukkan non-functional requirements (NFR): otorisasi role, audit trail mutasi, dan idempotency key.
+2. **Di Fase 1 (Review Desain Arsitektur)**:
+   - Periksa file `workspace/projects/{projectId}/architecture/c4-model.md`. Pastikan model relasi data memisahkan `InventoryItem` dari `InventoryApprovalRequest` untuk mencegah bypass status.
+3. **Di Fase 6 (Consensus Ballot di Dashboard)**:
+   - Dashboard sekarang menyediakan widget **"Cross-Cutting Council Triad Matrix"** dengan 3 tombol approval mandiri:
+     - 🏛️ **System Architect**: Memvalidasi modular boundary dan zero anti-patterns.
+     - 🛡️ **AppSec Auditor**: Memvalidasi hasil SAST scanner (OWASP Top 10 = 0 critical).
+     - ⚡ **Perf & DAST Scout**: Memvalidasi efisiensi query & test coverage $\ge 70\%$.
+   - Jika salah satu pilar menolak (veto), sistem otomatis mengulang fase pengembangan (maksimal 3 kali sebelum eskalasi Deadlock).
+
+---
+
+## 3.2 Dukungan Multi-Project & Multi-Tenant Terisolasi
+
+Sistem kini tidak lagi menimpa berkas global `docs/RAW_INPUT.md` atau `docs/REQUIREMENT.md`. Setiap kali Anda memulai task melalui Dashboard atau API:
+1. Anda dapat menyertakan `Project ID` (misal: `PRJ-INVENTORY-PROD`) dan `Client / Tenant` (misal: `CLIENT-ACME`).
+2. Orchestrator secara otomatis mengalokasikan direktori terisolasi:
+   ```text
+   workspace/
+   └── projects/
+       └── PRJ-INVENTORY-PROD/
+           ├── raw_input.md
+           ├── architecture/
+           ├── council-audits/
+           └── backlog/
+   ```
+3. Setiap proyek memiliki riwayat audit trail, ADR, dan hasil review council masing-masing tanpa tumpang tindih.
 
 ---
 
@@ -135,10 +178,13 @@ Jika Anda mengonfigurasikan environment variable `TELEGRAM_BOT_TOKEN` dan `TELEG
 ## 6. Lokasi Berkas Output Kerja Agen
 
 Semua artefak yang dihasilkan agen tersimpan rapi dan dapat Anda buka kapan saja di folder workspace:
-* **Spesifikasi & Gherkin**: `docs/REQUIREMENT.md` dan `workspace/specs/`
-* **Arsitektur C4 & Schema Database**: `workspace/architecture/C4_ARCHITECTURE_AND_SCHEMA.md`
-* **Sprint Backlog**: `workspace/backlog/SPRINT_BACKLOG.md`
-* **TDD & Test Suites**: `workspace/testing/TDD_PLAN_AND_SUITE.md`
-* **Laporan Pengujian Keamanan & Uji Beban**: `workspace/qa/PRE_PROD_VERIFICATION.md`
+* **Standar Rationale & Patterns**: [`workspace/PHASE_EXECUTION_STANDARD.md`](file:///c:/project/satset-magic/workspace/PHASE_EXECUTION_STANDARD.md)
+* **Checklist 17 Skills & Tools Registry**: [`docs/SKILL_LIST_TOOLS.md`](file:///c:/project/satset-magic/docs/SKILL_LIST_TOOLS.md)
+* **Spesifikasi & Gherkin**: `docs/REQUIREMENT.md` dan `workspace/projects/{projectId}/backlog/`
+* **Arsitektur C4 & Schema Database**: `workspace/projects/{projectId}/architecture/c4-model.md`
+* **Sprint Backlog**: `workspace/projects/{projectId}/backlog/SPRINT_BACKLOG.md`
+* **TDD & Test Suites**: `workspace/projects/{projectId}/testing/TDD_PLAN_AND_SUITE.md`
+* **Laporan Pengujian Keamanan & Uji Beban**: `workspace/projects/{projectId}/qa/PRE_PROD_VERIFICATION.md`
 * **Source Code Backend**: `orchestrator-service/src/`
 * **Source Code Frontend**: `dashboard-ui/src/`
+

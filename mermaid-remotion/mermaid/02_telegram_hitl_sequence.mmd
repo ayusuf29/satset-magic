@@ -1,0 +1,29 @@
+sequenceDiagram
+    autonumber
+    actor Human as Human Tech Lead (Telegram)
+    participant TeleAPI as Telegram Bot API (@SatsetMagicBot)
+    participant Orch as Spring Boot Orchestrator
+    participant Git as Git Engine & Protected Branch
+    participant Dash as Next.js Dashboard UI
+
+    Note over Orch: Phase 6: Triad Council Memberikan Unanimous PASS (3/3)
+    Orch->>Orch: Set State = PHASE_6_WAITING_HUMAN_CODE_REVIEW_AND_MERGE
+    Orch->>TeleAPI: POST /sendMessage (Markdown Card + Inline Buttons)
+    TeleAPI->>Human: Notifikasi Masuk: "⚠️ APPROVAL CODE REVIEW & MERGE"
+    
+    alt Skenario A: Setujui & Merge
+        Human->>TeleAPI: Tap Button "[✅ APPROVE & MERGE]"
+        TeleAPI->>Orch: POST /api/webhook/telegram (callback_data: "approve_merge:wf-xxx")
+        Note over Orch: Validasi Whitelist chat_id & Signature
+        Orch->>Git: git checkout main && git merge feat/xxx && git push origin main
+        Git-->>Orch: Merge Success (Commit: a4b1c2)
+        Orch->>TeleAPI: editMessageText ("✅ APPROVED & MERGED by @lead ke main branch")
+        Orch->>Dash: WebSocket Event (State: PHASE_7_QA_VERIFICATION)
+    else Skenario B: Tolak dengan Feedback
+        Human->>TeleAPI: Tap Button "[❌ REJECT WITH FEEDBACK]"
+        TeleAPI->>Human: "Ketik catatan revisi Anda (misal: /reject wf-xxx ubah indexing)"
+        Human->>TeleAPI: Kirim Pesan Revisi
+        TeleAPI->>Orch: POST /api/webhook/telegram (Command reject)
+        Orch->>Orch: Set State = PHASE_5_DEVELOPMENT_IMPLEMENTATION
+        Orch->>TeleAPI: editMessageText ("❌ REJECTED - Instruksi dikirim ke Developer Agent")
+    end

@@ -1,6 +1,6 @@
 import { WorkflowSummary, WorkflowDetail } from "./types";
 
-const API_BASE = process.env.NEXT_PUBLIC_ORCHESTRATOR_API_URL || "http://localhost:8080";
+const API_BASE = process.env.NEXT_PUBLIC_ORCHESTRATOR_API_URL || "http://127.0.0.1:8080";
 
 export async function fetchWorkflows(): Promise<WorkflowSummary[]> {
   try {
@@ -77,11 +77,22 @@ export async function fetchWorkflowDetail(id: string): Promise<WorkflowDetail> {
   }
 }
 
-export async function startWorkflow(taskName: string, description: string): Promise<WorkflowSummary> {
+export async function startWorkflow(
+  taskName: string,
+  description: string,
+  projectId?: string,
+  clientId?: string
+): Promise<WorkflowSummary> {
   const res = await fetch(`${API_BASE}/api/workflow/start`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ taskName, description, initialPayload: "{}" }),
+    body: JSON.stringify({
+      projectId: projectId || undefined,
+      clientId: clientId || undefined,
+      taskName,
+      description,
+      initialPayload: "{}"
+    }),
   });
   if (!res.ok) throw new Error("Gagal memulai workflow baru");
   return await res.json();
@@ -114,3 +125,60 @@ export async function advanceWorkflow(id: string, comment = "Manual advance"): P
   if (!res.ok) throw new Error("Gagal memajukan fase");
   return await res.json();
 }
+
+export async function submitCouncilReview(
+  id: string,
+  votes: {
+    architectApproved: boolean;
+    securityApproved: boolean;
+    performanceApproved: boolean;
+    coveragePercentage: number;
+    feedback: string;
+  }
+): Promise<WorkflowSummary> {
+  const res = await fetch(`${API_BASE}/api/workflow/${id}/council-review`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(votes),
+  });
+  if (!res.ok) throw new Error("Gagal mengirim hasil voting council triad");
+  return await res.json();
+}
+
+export interface ArtifactMeta {
+  name: string;
+  path: string;
+  type: "MARKDOWN" | "JSON" | "OTHER";
+}
+
+export async function fetchArtifacts(workflowId: string): Promise<ArtifactMeta[]> {
+  try {
+    const res = await fetch(`${API_BASE}/api/workflow/${workflowId}/artifacts`, { cache: "no-store" });
+    if (!res.ok) throw new Error("Failed to load artifacts");
+    return await res.json();
+  } catch (err) {
+    console.warn("Using fallback artifacts:", err);
+    return [
+      { name: "GHERKIN_REQUIREMENTS.md", path: "backlog/GHERKIN_REQUIREMENTS.md", type: "MARKDOWN" },
+      { name: "phase0-threat-model.md", path: "council-audits/phase0-threat-model.md", type: "MARKDOWN" },
+      { name: "SDLC_LOG.md", path: "SDLC_LOG.md", type: "MARKDOWN" },
+      { name: "raw_input.md", path: "raw_input.md", type: "MARKDOWN" },
+    ];
+  }
+}
+
+export async function fetchArtifactContent(workflowId: string, path: string): Promise<{ fileName: string; path: string; content: string }> {
+  const res = await fetch(`${API_BASE}/api/workflow/${workflowId}/artifact-content?path=${encodeURIComponent(path)}`, { cache: "no-store" });
+  if (!res.ok) throw new Error("Gagal membaca berkas: " + path);
+  return await res.json();
+}
+
+export async function deleteWorkflow(id: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/workflow/${id}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) throw new Error("Gagal menghapus proyek / workflow");
+}
+
+
+

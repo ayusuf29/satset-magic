@@ -1,0 +1,23 @@
+{
+  "name": "satset-remotion-workflow",
+  "version": "1.0.0",
+  "description": "Programmatic video explainer of Satset Magic Autonomous SDLC Workflow with HITL & Triad Council Consensus",
+  "scripts": {
+    "start": "remotion preview src/index.ts",
+    "preview": "remotion preview src/index.ts",
+    "build": "remotion render src/index.ts SDLCWorkflowExplainer out/workflow_explainer.mp4",
+    "render": "remotion render src/index.ts SDLCWorkflowExplainer out/workflow_explainer.mp4",
+    "render:still": "remotion still src/index.ts SDLCWorkflowExplainer out/thumbnail.png"
+  },
+  "dependencies": {
+    "@remotion/cli": "^4.0.218",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "remotion": "^4.0.218"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.10",
+    "@types/react-dom": "^18.3.0",
+    "typescript": "^5.6.2"
+  }
+}

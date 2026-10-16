@@ -17,6 +17,8 @@ agentic:
   model:
     provider: gemini
     api-key: ${GEMINI_API_KEY:}
+    model-name: ${GEMINI_MODEL_NAME:gemini-3.5-flash}
+    fallback-model-name: ${GEMINI_FALLBACK_MODEL_NAME:gemini-2.5-flash}
   workflow:
     max-review-loops: 3
     min-test-coverage: 70
@@ -24,3 +26,10 @@ agentic:
     telegram:
       bot-token: ${TELEGRAM_BOT_TOKEN:}
       chat-id: ${TELEGRAM_CHAT_ID:}
+
+logging:
+  level:
+    root: INFO
+    com.agentic.platform: DEBUG
+    org.springframework.web.servlet.mvc.method.annotation.SseEmitter: WARN
+

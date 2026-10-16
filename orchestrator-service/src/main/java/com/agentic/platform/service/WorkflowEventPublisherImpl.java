@@ -85,8 +85,9 @@ public class WorkflowEventPublisherImpl implements WorkflowEventPublisher {
                         .name(event.type())
                         .id(event.id())
                         .data(event));
-            } catch (IOException e) {
+            } catch (Throwable e) {
                 deadEmitters.add(emitter);
+                log.debug("SSE emitter connection closed or unreachable. Removing emitter.");
             }
         }
         emitters.removeAll(deadEmitters);

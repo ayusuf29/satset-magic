@@ -3,6 +3,7 @@
 import React from "react";
 import { WorkflowState } from "@/lib/types";
 import { Users, Code, Terminal, Activity, ShieldAlert } from "lucide-react";
+import { useLanguage } from "@/lib/i18n";
 
 interface AgentStatusGridProps {
   currentState: WorkflowState;
@@ -32,7 +33,7 @@ const TEAMS: TeamCard[] = [
     leadRole: "Fullstack Engineers & Review Lead",
     members: ["Spring Boot Worker", "Frontend Next.js Worker", "Senior Reviewer"],
     icon: <Code className="h-5 w-5 text-emerald-400" />,
-    activeInPhases: ["PHASE_4_TDD_PLANNING", "PHASE_5_DEVELOPMENT_IMPLEMENTATION", "PHASE_6_CODE_REVIEW", "PHASE_6_DEADLOCK_WAITING_HUMAN"],
+    activeInPhases: ["PHASE_4_TDD_PLANNING", "PHASE_5_DEVELOPMENT_IMPLEMENTATION", "PHASE_6_CODE_REVIEW", "PHASE_6_WAITING_HUMAN_CODE_REVIEW_AND_MERGE", "PHASE_6_DEADLOCK_WAITING_HUMAN"],
   },
   {
     name: "CI/CD & Staging",
@@ -61,12 +62,14 @@ const TEAMS: TeamCard[] = [
 ];
 
 export function AgentStatusGrid({ currentState }: AgentStatusGridProps) {
+  const { language, t } = useLanguage();
+
   return (
     <div className="w-full">
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-sm font-semibold text-white flex items-center gap-2">
-          <span>5-Team Topology Status</span>
-          <span className="text-xs text-slate-400 font-normal hidden sm:inline">(Live Autonomous Allocation)</span>
+          <span>{t.agentTeams.title}</span>
+          <span className="text-xs text-slate-400 font-normal hidden sm:inline">({language === "en" ? "Live Autonomous Allocation" : "Alokasi Otonom Langsung"})</span>
         </h3>
       </div>
 
@@ -75,14 +78,21 @@ export function AgentStatusGrid({ currentState }: AgentStatusGridProps) {
           const isActive = team.activeInPhases.includes(currentState);
           const isDeadlock = currentState === "PHASE_6_DEADLOCK_WAITING_HUMAN" && team.name === "Development Team";
 
-          let statusBadge = "IDLE";
+          const isWaitingSignOff =
+            (currentState === "PHASE_0_WAITING_HUMAN_SIGN_OFF" && team.name === "Product & Design") ||
+            (currentState === "PHASE_8_READY_FOR_PRODUCTION_GATE" && team.name === "Shared Enabling");
+
+          let statusBadge = t.agentTeams.idle.toUpperCase();
           let badgeColor = "bg-slate-800 text-slate-400 border-slate-700";
 
           if (isDeadlock) {
             statusBadge = "DEADLOCK";
             badgeColor = "bg-rose-500/20 text-rose-400 border-rose-500/40 animate-pulse";
+          } else if (isWaitingSignOff) {
+            statusBadge = language === "en" ? "WAITING SIGN-OFF" : "MENUNGGU SIGN-OFF";
+            badgeColor = "bg-amber-500/20 text-amber-400 border-amber-500/40 animate-pulse font-semibold";
           } else if (isActive) {
-            statusBadge = "ACTIVE";
+            statusBadge = t.agentTeams.running.toUpperCase();
             badgeColor = "bg-emerald-500/20 text-emerald-400 border-emerald-500/40 animate-pulse";
           }
 

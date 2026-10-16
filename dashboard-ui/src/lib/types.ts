@@ -7,6 +7,7 @@ export type WorkflowState =
   | "PHASE_4_TDD_PLANNING"
   | "PHASE_5_DEVELOPMENT_IMPLEMENTATION"
   | "PHASE_6_CODE_REVIEW"
+  | "PHASE_6_WAITING_HUMAN_CODE_REVIEW_AND_MERGE"
   | "PHASE_6_DEADLOCK_WAITING_HUMAN"
   | "PHASE_7_QA_VERIFICATION"
   | "PHASE_8_READY_FOR_PRODUCTION_GATE"
@@ -15,13 +16,21 @@ export type WorkflowState =
 
 export interface WorkflowSummary {
   id: string;
+  projectId?: string;
+  clientId?: string;
   taskName: string;
   description: string;
   currentState: WorkflowState;
   reviewLoopCount: number;
   coveragePercentage: number;
-  lastDecision?: string;
+  architectApproved?: boolean;
+  securityApproved?: boolean;
+  performanceApproved?: boolean;
   waitingForHuman: boolean;
+  agentRunning?: boolean;
+  currentAgentRole?: string;
+  currentAgentActivity?: string;
+  phaseProgressPercentage?: number;
   createdAt: string;
   updatedAt: string;
 }

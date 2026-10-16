@@ -11,6 +11,7 @@ class WorkflowStateTest {
     @DisplayName("Harus menandai state gerbang persetujuan manusia dengan benar")
     void shouldIdentifyHumanGateStates() {
         assertTrue(WorkflowState.PHASE_0_WAITING_HUMAN_SIGN_OFF.isHumanGate());
+        assertTrue(WorkflowState.PHASE_6_WAITING_HUMAN_CODE_REVIEW_AND_MERGE.isHumanGate());
         assertTrue(WorkflowState.PHASE_6_DEADLOCK_WAITING_HUMAN.isHumanGate());
         assertTrue(WorkflowState.PHASE_8_READY_FOR_PRODUCTION_GATE.isHumanGate());
 
@@ -38,8 +39,10 @@ class WorkflowStateTest {
                 WorkflowState.PHASE_4_TDD_PLANNING.getNextDefaultState());
         assertEquals(WorkflowState.PHASE_6_CODE_REVIEW,
                 WorkflowState.PHASE_5_DEVELOPMENT_IMPLEMENTATION.getNextDefaultState());
-        assertEquals(WorkflowState.PHASE_7_QA_VERIFICATION,
+        assertEquals(WorkflowState.PHASE_6_WAITING_HUMAN_CODE_REVIEW_AND_MERGE,
                 WorkflowState.PHASE_6_CODE_REVIEW.getNextDefaultState());
+        assertEquals(WorkflowState.PHASE_7_QA_VERIFICATION,
+                WorkflowState.PHASE_6_WAITING_HUMAN_CODE_REVIEW_AND_MERGE.getNextDefaultState());
         assertEquals(WorkflowState.PHASE_8_READY_FOR_PRODUCTION_GATE,
                 WorkflowState.PHASE_7_QA_VERIFICATION.getNextDefaultState());
         assertEquals(WorkflowState.PHASE_9_RELEASED,

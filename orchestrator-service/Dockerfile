@@ -1,17 +1,25 @@
-# Stage 1: Build stage
+# syntax=docker/dockerfile:1
+# Stage 1: Build stage with dependency caching
 FROM maven:3.9.8-eclipse-temurin-21 AS build
 WORKDIR /app
-COPY pom.xml .
-# Download dependencies terlebih dahulu untuk caching layer
-RUN mvn dependency:go-offline -B
-COPY src ./src
-RUN mvn clean package -DskipTests
 
-# Stage 2: Runtime stage
+# Copy pom.xml duluan agar dependensi di-cache terpisah dari kode sumber
+COPY pom.xml .
+
+# Download dependencies (akan di-cache selama pom.xml tidak berubah)
+RUN --mount=type=cache,target=/root/.m2 mvn dependency:go-offline -B
+
+# Copy source code
+COPY src ./src
+
+# Build JAR tanpa download ulang dependency
+RUN --mount=type=cache,target=/root/.m2 mvn package -DskipTests -o || \
+    mvn package -DskipTests
+
+# Stage 2: Runtime stage (Lightweight Alpine JRE)
 FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
 
-# Install git & curl jika worker membutuhkan eksekusi CLI dasar
 RUN apk add --no-cache git curl
 
 COPY --from=build /app/target/*.jar app.jar

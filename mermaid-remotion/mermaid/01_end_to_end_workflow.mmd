@@ -1,0 +1,63 @@
+flowchart TD
+    %% Styling Definitions
+    classDef agent fill:#1e293b,stroke:#3b82f6,stroke-width:2px,color:#f8fafc;
+    classDef council fill:#312e81,stroke:#6366f1,stroke-width:2px,color:#e0e7ff;
+    classDef hitl fill:#7c2d12,stroke:#f97316,stroke-width:3px,color:#ffedd5;
+    classDef decision fill:#374151,stroke:#9ca3af,stroke-width:2px,color:#f9fafb;
+    classDef success fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#ecfdf5;
+    classDef alert fill:#881337,stroke:#f43f5e,stroke-width:2px,color:#ffe4e6;
+
+    %% Phase 0: Discovery
+    subgraph P0 ["Phase 0: Requirement Discovery"]
+        P0_In["Input Ide Mentah (docs/RAW_INPUT.md)"]:::agent --> P0_Agent["PO & BA Agent<br/>(Dekomposisi User Stories & Gherkin AC)"]:::agent
+        P0_Agent --> P0_Audit["Shared Enabling Audit<br/>(Architect: Domain Boundary | AppSec: Threat Surface)"]:::council
+        P0_Audit --> HITL_0{"[HITL GATE 1]<br/>Sign-off Kebutuhan & NFR<br/>(Dashboard / Telegram)"}:::hitl
+    end
+
+    %% Phase 1 & 2: Architecture & Backlog
+    subgraph P1_2 ["Phase 1 - 2: Architecture & Backlog"]
+        HITL_0 -- "Disetujui" --> P1_Arch["System Architect Agent<br/>(C4 Model, ADR, Schema ERD)"]:::agent
+        P1_Arch --> P1_Sec["AppSec & Perf Specialist<br/>(STRIDE Threat Model & Latency Budget P95)"]:::council
+        P1_Sec --> P2_Backlog["PO & Enabling Team<br/>(Backlog dengan Cross-Cutting Security/Perf AC)"]:::agent
+    end
+
+    HITL_0 -- "Ditolak / Revisi" --> P0_Agent
+
+    %% Phase 3 - 5: Dispatching, TDD & Dev
+    subgraph P3_5 ["Phase 3 - 5: Parallel Implementation"]
+        P2_Backlog --> P3_Disp["Task Dispatching Engine<br/>(Alokasi ke Ephemeral Feature Branch: feat/xxx)"]:::agent
+        P3_Disp --> P4_TDD["TDD Orchestrator<br/>(Negative Security Tests, Concurrency & Logic Specs)"]:::agent
+        P4_TDD --> P5_Dev["Worker Agents: Backend & Frontend<br/>(Java 21 Clean Arch + Next.js UI)"]:::agent
+    end
+
+    %% Phase 6: Code Review Consortium & HITL MERGE GATE
+    subgraph P6 ["Phase 6: Code Review & Protected Branch Gate"]
+        P5_Dev --> P6_PR["Git Engine: Buka Pull Request (PR)<br/>Target: main branch (PROTECTED)"]:::agent
+        P6_PR --> P6_Consensus{"Triad Council Ballot<br/>Architect 🏛️ + Security 🛡️ + Perf ⚡<br/>Coverage >= 70%?"}:::council
+
+        P6_Consensus -- "Unanimous PASS (3/3)" --> HITL_6{"[HITL GATE 2: CODE REVIEW & MERGE]<br/>Human Tech Lead / Reviewer<br/>(Otorisasi Merge ke main branch)"}:::hitl
+        
+        P6_Consensus -- "Veto / Failed" --> P6_RetryCount{"Loop Counter < 3x?"}:::decision
+        P6_RetryCount -- "Ya (Loop 1-2)" --> P6_Fix["Kirim Feedback ke Worker Agent<br/>(Auto-Refactoring)"]:::agent --> P5_Dev
+        P6_RetryCount -- "Tidak (Loop 3x Habis)" --> P6_Deadlock["[DEADLOCK ALERT]<br/>Review Terbuntukan 3x"]:::alert
+        P6_Deadlock --> HITL_6_DL{"[HITL GATE: DEADLOCK RESOLUTION]<br/>Override atau Revisi Manual<br/>(Dashboard / Telegram)"}:::hitl
+        HITL_6_DL -- "Instruksi Baru" --> P5_Dev
+    end
+
+    %% Merge Action
+    HITL_6 -- "Disetujui & Merge" --> P6_Merged["Git Engine: Merge PR ke main branch<br/>(Trigger CI Sandbox Build)"]:::success
+    HITL_6 -- "Ditolak dengan Catatan" --> P5_Dev
+    HITL_6_DL -- "Override & Loloskan" --> P6_Merged
+
+    %% Phase 7 & 8: QA, Pre-Prod & Production Gate
+    subgraph P7_8 ["Phase 7 - 8: Pre-Prod Verification & Release Gate"]
+        P6_Merged --> P7_QA["QA Automation Agent<br/>(Playwright Web & Smoke API Test)"]:::agent
+        P7_QA --> P8_DAST["DAST & k6 Stress Runner<br/>(OWASP ZAP Scan, Mobile MAST, Latency < 200ms)"]:::council
+        P8_DAST --> HITL_8{"[HITL GATE 3: PROD RELEASE]<br/>Otorisasi Rilis Final ke Live Prod<br/>(Dashboard / Telegram)"}:::hitl
+    end
+
+    %% Phase 9: Released
+    subgraph P9 ["Phase 9: Live Production"]
+        HITL_8 -- "Deploy ke Prod" --> P9_Prod["DevOps & SRE Agent<br/>(Live Rollout + Prometheus & OTel Telemetry)"]:::success
+        HITL_8 -- "Hold / Abort" --> P5_Dev
+    end

@@ -1,0 +1,25 @@
+flowchart TD
+    classDef pr fill:#1e293b,stroke:#3b82f6,stroke-width:2px,color:#f8fafc;
+    classDef council fill:#312e81,stroke:#6366f1,stroke-width:2px,color:#e0e7ff;
+    classDef logic fill:#1e1b4b,stroke:#a855f7,stroke-width:2px,color:#f3e8ff;
+    classDef pass fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#ecfdf5;
+    classDef reject fill:#881337,stroke:#f43f5e,stroke-width:2px,color:#ffe4e6;
+    classDef hitl fill:#7c2d12,stroke:#f97316,stroke-width:2px,color:#ffedd5;
+
+    PR["Pull Request Created<br/>(feat/* -> main)"]:::pr --> Split{"Broadcast to Council"}
+
+    Split --> Arch["🏛️ Enterprise Architect<br/>- Hexagonal / Ports & Adapters<br/>- Zero Leaky Abstraction<br/>- Domain Boundaries & ADR"]:::council
+    Split --> Sec["🛡️ AppSec Specialist<br/>- SAST Scan (0 High/Critical)<br/>- Zero Hardcoded Secret<br/>- OWASP Top 10 Compliance"]:::council
+    Split --> Perf["⚡ DB & Perf Specialist<br/>- Latency Budget P95 < 200ms<br/>- Indexing on Filter Columns<br/>- Test Coverage >= 70%"]:::council
+
+    Arch --> Ballot{"Consensus Aggregator<br/>V = Arch ∧ Sec ∧ Perf"}:::logic
+    Sec --> Ballot
+    Perf --> Ballot
+
+    Ballot -- "Unanimous TRUE (3/3)" --> PassGate["✅ Automated Consensus Passed"]:::pass
+    PassGate --> HITL["🔒 Human Tech Lead Approval Required<br/>(Bot Merging to Main is Forbidden)"]:::hitl
+
+    Ballot -- "Any Veto / False" --> VetoGate["❌ Consensus Rejected"]:::reject
+    VetoGate --> Counter{"Review Loop Counter"}
+    Counter -- "< 3 Iterations" --> Dev["Return Actionable Audit Feedback<br/>to Developer Agent"]:::pr
+    Counter -- "= 3 Iterations" --> Deadlock["⚠️ DEADLOCK ESCALATION<br/>Human Tech Lead Intervention"]:::reject

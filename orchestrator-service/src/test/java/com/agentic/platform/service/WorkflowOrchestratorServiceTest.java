@@ -5,6 +5,7 @@ import com.agentic.platform.domain.model.WorkflowInstance;
 import com.agentic.platform.domain.model.WorkflowState;
 import com.agentic.platform.domain.repository.WorkflowRepository;
 import com.agentic.platform.domain.repository.WorkflowTransitionLogRepository;
+import com.agentic.platform.service.lifecycle.PhaseExecutionManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -40,16 +41,25 @@ class WorkflowOrchestratorServiceTest {
     @Mock
     private AgentExecutionService agentExecutionService;
 
+    @Mock
+    private dev.langchain4j.model.chat.ChatLanguageModel chatLanguageModel;
+
+    private PhaseExecutionManager phaseExecutionManager;
+
     private WorkflowOrchestratorService orchestratorService;
 
     @BeforeEach
     void setUp() {
+        phaseExecutionManager = new PhaseExecutionManager(java.util.Collections.emptyList());
+
         orchestratorService = new WorkflowOrchestratorServiceImpl(
                 workflowRepository,
                 transitionLogRepository,
                 eventPublisher,
                 notificationService,
-                agentExecutionService
+                agentExecutionService,
+                chatLanguageModel,
+                phaseExecutionManager
         );
         ReflectionTestUtils.setField(orchestratorService, "maxReviewLoops", 3);
         ReflectionTestUtils.setField(orchestratorService, "minTestCoverage", 70.0);
@@ -89,7 +99,45 @@ class WorkflowOrchestratorServiceTest {
         WorkflowInstance updated = orchestratorService.advanceWorkflow("wf-test-01", "ARCHITECT", "C4 diagram approved");
 
         assertEquals(WorkflowState.PHASE_2_BACKLOG_GENERATION, updated.getCurrentState());
-        verify(eventPublisher).publishEvent(any());
+        verify(eventPublisher, atLeastOnce()).publishEvent(any());
+    }
+
+    @Test
+    @DisplayName("Dilarang memajukan workflow jika agent masih aktif mengeksekusi tugas")
+    void shouldThrowExceptionWhenAdvancingWhileAgentIsRunning() {
+        WorkflowInstance workflow = WorkflowInstance.builder()
+                .id("wf-agent-running")
+                .taskName("Active Agent Task")
+                .currentState(WorkflowState.PHASE_0_REQUIREMENT_DISCOVERY)
+                .agentRunning(true)
+                .currentAgentRole("PO / Spec Writer Agent")
+                .currentAgentActivity("Memproses skenario Gherkin")
+                .build();
+
+        when(workflowRepository.findById("wf-agent-running")).thenReturn(Optional.of(workflow));
+
+        assertThrows(InvalidWorkflowTransitionException.class, () ->
+                orchestratorService.advanceWorkflow("wf-agent-running", "HUMAN", "Premature advance")
+        );
+    }
+
+    @Test
+    @DisplayName("Dilarang memberikan keputusan sign-off jika agent masih aktif bekerja")
+    void shouldThrowExceptionWhenHumanSignOffWhileAgentIsRunning() {
+        WorkflowInstance workflow = WorkflowInstance.builder()
+                .id("wf-agent-gate-running")
+                .taskName("Active Gate Task")
+                .currentState(WorkflowState.PHASE_0_WAITING_HUMAN_SIGN_OFF)
+                .agentRunning(true)
+                .currentAgentRole("AppSec Auditor Agent")
+                .currentAgentActivity("Melakukan threat modeling")
+                .build();
+
+        when(workflowRepository.findById("wf-agent-gate-running")).thenReturn(Optional.of(workflow));
+
+        assertThrows(InvalidWorkflowTransitionException.class, () ->
+                orchestratorService.handleHumanDecision("wf-agent-gate-running", "APPROVE", "Premature signoff", "HUMAN")
+        );
     }
 
     @Test
@@ -99,6 +147,7 @@ class WorkflowOrchestratorServiceTest {
                 .id("wf-test-gate")
                 .taskName("Gate Task")
                 .currentState(WorkflowState.PHASE_0_WAITING_HUMAN_SIGN_OFF)
+                .agentRunning(false)
                 .build();
 
         when(workflowRepository.findById("wf-test-gate")).thenReturn(Optional.of(workflow));
@@ -128,8 +177,54 @@ class WorkflowOrchestratorServiceTest {
                 "SENIOR_REVIEWER"
         );
 
-        assertEquals(WorkflowState.PHASE_7_QA_VERIFICATION, updated.getCurrentState());
+        assertEquals(WorkflowState.PHASE_6_WAITING_HUMAN_CODE_REVIEW_AND_MERGE, updated.getCurrentState());
         assertEquals(85.5, updated.getCoveragePercentage());
+    }
+
+    @Test
+    @DisplayName("Persetujuan manusia pada PHASE_6_WAITING_HUMAN_CODE_REVIEW_AND_MERGE memajukan workflow ke PHASE_7_QA_VERIFICATION")
+    void shouldAdvanceToQaWhenHumanApprovesMergeGate() {
+        WorkflowInstance workflow = WorkflowInstance.builder()
+                .id("wf-merge-gate")
+                .taskName("Merge to Main Gate")
+                .currentState(WorkflowState.PHASE_6_WAITING_HUMAN_CODE_REVIEW_AND_MERGE)
+                .build();
+
+        when(workflowRepository.findById("wf-merge-gate")).thenReturn(Optional.of(workflow));
+
+        WorkflowInstance updated = orchestratorService.handleHumanDecision(
+                "wf-merge-gate",
+                "APPROVE",
+                "PR approved and merged to protected main branch",
+                "TECH_LEAD"
+        );
+
+        assertEquals(WorkflowState.PHASE_7_QA_VERIFICATION, updated.getCurrentState());
+        assertEquals("APPROVED", updated.getLastDecision());
+    }
+
+    @Test
+    @DisplayName("Penolakan manusia pada PHASE_6_WAITING_HUMAN_CODE_REVIEW_AND_MERGE mengembalikan workflow ke PHASE_5_DEVELOPMENT_IMPLEMENTATION")
+    void shouldReturnToDevWhenHumanRejectsMergeGate() {
+        WorkflowInstance workflow = WorkflowInstance.builder()
+                .id("wf-merge-reject")
+                .taskName("Merge to Main Gate")
+                .currentState(WorkflowState.PHASE_6_WAITING_HUMAN_CODE_REVIEW_AND_MERGE)
+                .reviewLoopCount(0)
+                .build();
+
+        when(workflowRepository.findById("wf-merge-reject")).thenReturn(Optional.of(workflow));
+
+        WorkflowInstance updated = orchestratorService.handleHumanDecision(
+                "wf-merge-reject",
+                "REJECT",
+                "Need additional integration tests before merging to main",
+                "TECH_LEAD"
+        );
+
+        assertEquals(WorkflowState.PHASE_5_DEVELOPMENT_IMPLEMENTATION, updated.getCurrentState());
+        assertEquals("REJECTED", updated.getLastDecision());
+        assertEquals(1, updated.getReviewLoopCount());
     }
 
     @Test
@@ -201,5 +296,61 @@ class WorkflowOrchestratorServiceTest {
 
         assertEquals(WorkflowState.PHASE_9_RELEASED, updated.getCurrentState());
         assertEquals("APPROVED", updated.getLastDecision());
+    }
+
+    @Test
+    @DisplayName("Council Triad lolos jika Architect, Security, dan Perf semuanya setuju dengan coverage >= 70%")
+    void shouldPassCouncilReviewWhenAllThreeApprove() {
+        WorkflowInstance workflow = WorkflowInstance.builder()
+                .id("wf-council-pass")
+                .taskName("Council Pass Task")
+                .currentState(WorkflowState.PHASE_6_CODE_REVIEW)
+                .reviewLoopCount(0)
+                .build();
+
+        when(workflowRepository.findById("wf-council-pass")).thenReturn(Optional.of(workflow));
+
+        WorkflowInstance updated = orchestratorService.handleCouncilReviewResult(
+                "wf-council-pass",
+                true, // Architect
+                true, // Security
+                true, // Performance
+                82.0,
+                "Konsensus Triad tercapai"
+        );
+
+        assertEquals(WorkflowState.PHASE_6_WAITING_HUMAN_CODE_REVIEW_AND_MERGE, updated.getCurrentState());
+        assertTrue(updated.isArchitectApproved());
+        assertTrue(updated.isSecurityApproved());
+        assertTrue(updated.isPerformanceApproved());
+        assertEquals(82.0, updated.getCoveragePercentage());
+    }
+
+    @Test
+    @DisplayName("Council Triad gagal jika salah satu pilar veto (Security REJECT) meskipun Architect dan Perf setuju")
+    void shouldRejectCouncilReviewWhenSecurityVetos() {
+        WorkflowInstance workflow = WorkflowInstance.builder()
+                .id("wf-council-veto")
+                .taskName("Security Veto Task")
+                .currentState(WorkflowState.PHASE_6_CODE_REVIEW)
+                .reviewLoopCount(0)
+                .build();
+
+        when(workflowRepository.findById("wf-council-veto")).thenReturn(Optional.of(workflow));
+
+        WorkflowInstance updated = orchestratorService.handleCouncilReviewResult(
+                "wf-council-veto",
+                true,  // Architect
+                false, // Security VETO
+                true,  // Performance
+                85.0,
+                "SAST mendeteksi OWASP A01 broken access control"
+        );
+
+        assertEquals(WorkflowState.PHASE_5_DEVELOPMENT_IMPLEMENTATION, updated.getCurrentState());
+        assertTrue(updated.isArchitectApproved());
+        assertFalse(updated.isSecurityApproved());
+        assertTrue(updated.isPerformanceApproved());
+        assertEquals(1, updated.getReviewLoopCount());
     }
 }

@@ -3,10 +3,10 @@ name: system-design-architect
 description: Produces scalable distributed system architectures, C4 model diagrams (Mermaid), ADR decision records, API contracts, and high-availability topologies.
 ---
 
-# Domain 5: System Design Architect (Enterprise Architecture)
+# Domain 5: System Design Architect (Enterprise Solutions Architecture)
 
 ## Role & Mission
-Bertindak sebagai Enterprise Solutions Architect. Merancang arsitektur sistem terdistribusi berskala besar, memetakan batas konteks (Bounded Context), mendokumentasikan Architectural Decision Records (ADR), dan memvisualisasikan sistem menggunakan model C4 (Context, Container, Component, Code) via Mermaid.js.
+Bertindak sebagai Enterprise Solutions Architect. Merancang arsitektur sistem terdistribusi berskala besar, memetakan batas konteks (Bounded Context), mendokumentasikan Architectural Decision Records (ADR), dan memvisualisasikan sistem menggunakan model C4 via Mermaid.js.
 
 ## Core Directives
 1. **C4 Model Representation**:
@@ -16,14 +16,18 @@ Bertindak sebagai Enterprise Solutions Architect. Merancang arsitektur sistem te
 2. **ADR Standardization**:
    - Dokumentasikan setiap keputusan arsitektur strategis dengan format MADR (Status, Context, Decision, Consequences).
 3. **Resilience & High Availability**:
-   - Rancang mekanisme failover, idempotency key untuk event broker, dead-letter queue (DLQ), dan data partitioning.
-4. **API First & Schema Contracts**:
-   - Definisikan kontrak antarmuka (OpenAPI 3.0 / AsyncAPI) sebelum implementasi kode backend dan frontend dimulai.
+   - Rancang mekanisme failover, idempotency key untuk event broker, dead-letter queue (DLQ), connection pool tuning, dan data partitioning.
+4. **Mandatory Documentation Section**:
+   Setiap berkas arsitektur wajib menyertakan section:
+   ```markdown
+   ## 🛠️ Skills, Patterns & Rationale ("Why")
+   - **Skill Used:** system-design-architect, c4-model-designer
+   - **Pattern/Technique:** Hexagonal / Clean Architecture, Bounded Contexts, Idempotency State Machine
+   - **Why:** Memastikan sistem dapat diskalakan secara horizontal, memiliki batas isolasi data yang jelas, dan toleran terhadap kegagalan jaringan atau node.
+   ```
 
 ## Workflow Eksekusi
-1. **Analyze NFRs (Non-Functional Requirements)**: Analisis throughput, latensi P95, konsistensi data (ACID vs BASE), dan SLA.
-2. **Generate Diagrams**: Buat diagram Mermaid terstandar di file dokumentasi arsitektur (`docs/` atau `tasks/01_architecture_and_backlog.md`).
-3. **Define State Machine**:
-   - Modelkan alur state agen (e.g. `PENDING`, `DISCOVERING`, `PLANNING`, `EXECUTING`, `REVIEWING`, `WAITING_APPROVAL`, `COMPLETED`, `FAILED`).
-4. **Publish Architectural Contracts**:
-   - Simpan dokumen ADR di `workspace/adr/` dan pastikan seluruh developer agent mematuhi arsitektur yang disepakati.
+1. Analisis NFR (Non-Functional Requirements): throughput, latensi P95, konsistensi data (ACID vs BASE).
+2. Susun diagram C4 di `workspace/projects/{projectId}/architecture/c4-model.md`.
+3. Definisikan state machine transaksi dan kontrak DDL database.
+4. Terbitkan catatan ADR jika terdapat pemilihan teknologi krusial.

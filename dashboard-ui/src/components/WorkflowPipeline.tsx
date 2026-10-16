@@ -1,7 +1,8 @@
 "use client";
 
-import React from "react";
+import React, { useMemo } from "react";
 import { WorkflowState } from "@/lib/types";
+import { useLanguage } from "@/lib/i18n";
 import {
   FileText,
   Compass,
@@ -28,23 +29,23 @@ interface StepMeta {
   icon: React.ReactNode;
 }
 
-const PHASES: StepMeta[] = [
-  { state: "PHASE_0_REQUIREMENT_DISCOVERY", shortLabel: "0. PRD", name: "Requirements", icon: <FileText className="h-4 w-4" /> },
-  { state: "PHASE_1_ARCHITECTURE_AND_DESIGN", shortLabel: "1. Arch", name: "C4 Architecture", icon: <Compass className="h-4 w-4" /> },
-  { state: "PHASE_2_BACKLOG_GENERATION", shortLabel: "2. Backlog", name: "User Stories", icon: <ListTodo className="h-4 w-4" /> },
-  { state: "PHASE_3_TASK_DISPATCHING", shortLabel: "3. Dispatch", name: "Task Allocator", icon: <Send className="h-4 w-4" /> },
-  { state: "PHASE_4_TDD_PLANNING", shortLabel: "4. TDD", name: "Test First Suite", icon: <TestTube2 className="h-4 w-4" /> },
-  { state: "PHASE_5_DEVELOPMENT_IMPLEMENTATION", shortLabel: "5. Dev", name: "Coding & Impl", icon: <Code2 className="h-4 w-4" /> },
-  { state: "PHASE_6_CODE_REVIEW", shortLabel: "6. Review", name: "Consortium Audit", icon: <CheckCheck className="h-4 w-4" /> },
-  { state: "PHASE_7_QA_VERIFICATION", shortLabel: "7. QA", name: "E2E Sandbox", icon: <ShieldCheck className="h-4 w-4" /> },
-  { state: "PHASE_8_READY_FOR_PRODUCTION_GATE", shortLabel: "8. Gate", name: "DAST/MAST Gate", icon: <AlertTriangle className="h-4 w-4" /> },
-  { state: "PHASE_9_RELEASED", shortLabel: "9. Release", name: "Production Live", icon: <Rocket className="h-4 w-4" /> },
+const PHASE_STATES: WorkflowState[] = [
+  "PHASE_0_REQUIREMENT_DISCOVERY",
+  "PHASE_1_ARCHITECTURE_AND_DESIGN",
+  "PHASE_2_BACKLOG_GENERATION",
+  "PHASE_3_TASK_DISPATCHING",
+  "PHASE_4_TDD_PLANNING",
+  "PHASE_5_DEVELOPMENT_IMPLEMENTATION",
+  "PHASE_6_CODE_REVIEW",
+  "PHASE_7_QA_VERIFICATION",
+  "PHASE_8_READY_FOR_PRODUCTION_GATE",
+  "PHASE_9_RELEASED",
 ];
 
 function getPhaseIndex(state: WorkflowState): number {
   if (state === "PHASE_0_WAITING_HUMAN_SIGN_OFF") return 0;
-  if (state === "PHASE_6_DEADLOCK_WAITING_HUMAN") return 6;
-  return PHASES.findIndex((p) => p.state === state);
+  if (state === "PHASE_6_WAITING_HUMAN_CODE_REVIEW_AND_MERGE" || state === "PHASE_6_DEADLOCK_WAITING_HUMAN") return 6;
+  return PHASE_STATES.indexOf(state);
 }
 
 export function WorkflowPipeline({
@@ -52,12 +53,30 @@ export function WorkflowPipeline({
   reviewLoopCount,
   coveragePercentage,
 }: WorkflowPipelineProps) {
+  const { t } = useLanguage();
   const currentIndex = getPhaseIndex(currentState);
   const isDeadlock = currentState === "PHASE_6_DEADLOCK_WAITING_HUMAN";
   const isWaitingHuman =
     currentState === "PHASE_0_WAITING_HUMAN_SIGN_OFF" ||
+    currentState === "PHASE_6_WAITING_HUMAN_CODE_REVIEW_AND_MERGE" ||
     currentState === "PHASE_6_DEADLOCK_WAITING_HUMAN" ||
     currentState === "PHASE_8_READY_FOR_PRODUCTION_GATE";
+
+  const phases: StepMeta[] = useMemo(
+    () => [
+      { state: "PHASE_0_REQUIREMENT_DISCOVERY", shortLabel: t.phases.prd.short, name: t.phases.prd.name, icon: <FileText className="h-4 w-4" /> },
+      { state: "PHASE_1_ARCHITECTURE_AND_DESIGN", shortLabel: t.phases.arch.short, name: t.phases.arch.name, icon: <Compass className="h-4 w-4" /> },
+      { state: "PHASE_2_BACKLOG_GENERATION", shortLabel: t.phases.backlog.short, name: t.phases.backlog.name, icon: <ListTodo className="h-4 w-4" /> },
+      { state: "PHASE_3_TASK_DISPATCHING", shortLabel: t.phases.dispatch.short, name: t.phases.dispatch.name, icon: <Send className="h-4 w-4" /> },
+      { state: "PHASE_4_TDD_PLANNING", shortLabel: t.phases.tdd.short, name: t.phases.tdd.name, icon: <TestTube2 className="h-4 w-4" /> },
+      { state: "PHASE_5_DEVELOPMENT_IMPLEMENTATION", shortLabel: t.phases.dev.short, name: t.phases.dev.name, icon: <Code2 className="h-4 w-4" /> },
+      { state: "PHASE_6_CODE_REVIEW", shortLabel: t.phases.review.short, name: t.phases.review.name, icon: <CheckCheck className="h-4 w-4" /> },
+      { state: "PHASE_7_QA_VERIFICATION", shortLabel: t.phases.qa.short, name: t.phases.qa.name, icon: <ShieldCheck className="h-4 w-4" /> },
+      { state: "PHASE_8_READY_FOR_PRODUCTION_GATE", shortLabel: t.phases.prodGate.short, name: t.phases.prodGate.name, icon: <AlertTriangle className="h-4 w-4" /> },
+      { state: "PHASE_9_RELEASED", shortLabel: t.phases.released.short, name: t.phases.released.name, icon: <Rocket className="h-4 w-4" /> },
+    ],
+    [t]
+  );
 
   return (
     <div className="w-full rounded-2xl glass-panel p-4 sm:p-5">
@@ -66,31 +85,31 @@ export function WorkflowPipeline({
         <div>
           <div className="flex items-center gap-2">
             <h2 className="text-sm sm:text-base font-semibold text-white">
-              Autonomous SDLC Pipeline Tracker
+              {t.phases.trackerTitle}
             </h2>
             {isDeadlock && (
               <span className="inline-flex items-center gap-1 rounded-full bg-rose-500/10 px-2 py-0.5 text-[11px] font-bold text-rose-400 border border-rose-500/30 animate-pulse">
-                DEADLOCK (3x GAGAL)
+                {t.phases.deadlockBadge}
               </span>
             )}
             {isWaitingHuman && !isDeadlock && (
               <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] font-semibold text-amber-400 border border-amber-500/30">
-                WAITING SIGN-OFF
+                {t.phases.waitingSignOffBadge}
               </span>
             )}
           </div>
           <p className="text-xs text-slate-400 mt-0.5">
-            Tahap saat ini: <span className="text-blue-400 font-mono font-medium">{currentState}</span>
+            {t.phases.currentStageLabel} <span className="text-blue-400 font-mono font-medium">{currentState}</span>
           </p>
         </div>
 
         {/* Telemetry pill */}
         <div className="flex items-center gap-3 text-xs">
           <div className="rounded-lg bg-slate-900 border border-slate-800 px-2.5 py-1 text-slate-300">
-            Loop Review: <span className={`font-semibold ${reviewLoopCount >= 3 ? "text-rose-400" : "text-slate-100"}`}>{reviewLoopCount}/3</span>
+            {t.pipeline.reviewLoops(reviewLoopCount)}
           </div>
           <div className="rounded-lg bg-slate-900 border border-slate-800 px-2.5 py-1 text-slate-300">
-            Coverage: <span className={`font-semibold ${coveragePercentage >= 70 ? "text-emerald-400" : coveragePercentage > 0 ? "text-amber-400" : "text-slate-400"}`}>{coveragePercentage}%</span>
+            {t.pipeline.testCoverage(coveragePercentage)}
           </div>
         </div>
       </div>
@@ -98,7 +117,7 @@ export function WorkflowPipeline({
       {/* Horizontal Scroll on Mobile, Grid/Flex on Desktop */}
       <div className="relative">
         <div className="flex items-center gap-2 sm:gap-3 overflow-x-auto pb-3 pt-1 scrollbar-thin no-scrollbar">
-          {PHASES.map((phase, idx) => {
+          {phases.map((phase, idx) => {
             const isCompleted = idx < currentIndex;
             const isCurrent = idx === currentIndex;
             const isFuture = idx > currentIndex;

@@ -55,14 +55,25 @@ public class AgentExecutionServiceImpl implements AgentExecutionService {
                     )
             );
 
+            long start = System.currentTimeMillis();
             Response<AiMessage> response = chatLanguageModel.generate(List.of(systemMessage, userMessage));
+            long duration = System.currentTimeMillis() - start;
             String output = response.content().text();
+
+            log.info("╔══════════════════════════════════════════════════════════════════════════╗");
+            log.info("║ [AGENT SERVICE LLM AUDIT] Workflow: {} | Phase: {}", workflow.getId(), phaseName);
+            log.info("║ Duration: {} ms", duration);
+            log.info("╟──────────────────────────────────────────────────────────────────────────╢");
+            log.info("║ [PROMPT]:\n{}", userMessage.text());
+            log.info("╟──────────────────────────────────────────────────────────────────────────╢");
+            log.info("║ [RESPONSE]:\n{}", output);
+            log.info("╚══════════════════════════════════════════════════════════════════════════╝");
 
             eventPublisher.publishEvent(AgentEvent.of(
                     workflow.getId(),
                     workflow.getCurrentState(),
                     "AGENT_OUTPUT",
-                    "Agent menyelesaikan analisis fase: " + phaseName
+                    "Agent menyelesaikan analisis fase: " + phaseName + " (" + duration + " ms)"
             ));
 
             return output;

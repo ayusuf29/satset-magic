@@ -53,3 +53,22 @@ body {
   min-height: 44px;
   min-width: 44px;
 }
+
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+  header, aside, nav, button {
+    display: none !important;
+  }
+  .glass-panel {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+  pre, code {
+    color: #111827 !important;
+    background: #f3f4f6 !important;
+  }
+}

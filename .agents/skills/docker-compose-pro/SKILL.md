@@ -3,30 +3,28 @@ name: docker-compose-pro
 description: Crafts hardened container manifests, multi-stage Dockerfiles, Docker Compose networking, volume management, and ephemeral staging pipelines.
 ---
 
-# Domain 8: Docker Compose Pro (Containerization & DevOps Runner)
+# Domain 8: Container Architecture & Docker Compose Specialist
 
 ## Role & Mission
-Bertindak sebagai Lead DevOps & Container Platform Engineer. Bertanggung jawab mengelola orkestrasi container lokal dan staging, merancang multi-stage build yang ringan dan aman, mengisolasi jaringan internal service, serta mengatur volume persistensi.
+Bertindak sebagai Lead Container & Infrastructure Architect. Merancang manifest multi-container Docker Compose yang aman, multi-stage Dockerfile yang ramping (*distroless / alpine*), isolasi jaringan internal, volume persisten, dan pipeline staging efemeral yang dapat direproduksi secara instan.
 
 ## Core Directives
-1. **Multi-Stage Build Optimization**:
-   - Pisahkan layer builder (SDK lengkap, compiler) dengan runtime image (minimal JRE / Node slim / alpine).
-   - Pastikan caching layer optimal: copy dependency file (`pom.xml`, `package.json`) sebelum menyalin source code.
-2. **Container Security & Hardening**:
-   - Jalankan container dengan non-root user bila memungkinkan.
-   - Minimalkan footprint image (gunakan base image Alpine atau distroless).
-   - Jangan pernah menyematkan secrets di build arguments atau environment variabel statis di Dockerfile.
-3. **Healthcheck & Dependency Ordering**:
-   - Layanan yang bergantung pada database atau cache wajib menggunakan `depends_on` dengan `condition: service_healthy`.
-   - Konfigurasikan endpoint healthcheck yang akurat (e.g. `pg_isready`, Actuator `/actuator/health`).
-4. **Volume Persistence & Workspaces**:
-   - Pastikan direktori `workspace`, `docs`, dan `tasks` di-mount dengan tepat agar hasil kerja agen langsung tersinkronisasi ke host lokal.
+1. **Multi-Stage Build Hardening**:
+   - Pisahkan stage build (mengandung JDK, Maven, Node.js) dari stage runtime (hanya JRE slim atau Node runner minimal).
+   - Jalankan container sebagai non-root user (`USER nonroot` atau `USER 1000:1000`).
+2. **Compose Networking & Secret Segregation**:
+   - Definisikan private bridge networks (database dan cache tidak boleh dipublikasikan port-nya ke host publik di environment produksi).
+   - Gunakan healthcheck eksplisit untuk menjamin urutan dependensi kontainer (`depends_on: condition: service_healthy`).
+3. **Mandatory Documentation Section**:
+   Setiap manifest container wajib menyertakan section:
+   ```markdown
+   ## 🛠️ Skills, Patterns & Rationale ("Why")
+   - **Skill Used:** docker-compose-pro, github-actions-architect
+   - **Pattern/Technique:** Multi-Stage Build, Non-Root Container Execution, Healthcheck Dependency Orchestration
+   - **Why:** Memangkas ukuran image hingga 70%, meminimalkan attack surface dari OS tools yang tidak dibutuhkan, dan mencegah race-condition saat startup service.
+   ```
 
 ## Workflow Eksekusi
-1. **Validate Manifests**: Periksa sintaks `docker-compose.yml` dan `Dockerfile` (`docker compose config`).
-2. **Build & Test Images**: Uji pembuatan image dan pastikan ukuran image sekecil mungkin.
-3. **Orchestrate Local Stack**:
-   - Jalankan stack dengan `docker compose up -d`.
-   - Monitor log dan status service dengan `docker compose ps` dan `docker compose logs -f`.
-4. **Teardown & Clean Up**:
-   - Bersihkan dangling containers dan volume sementara bila runner selesai.
+1. Rancang `Dockerfile` multi-stage di folder service.
+2. Definisikan `docker-compose.yml` dengan healthcheck di root workspace.
+3. Verifikasi dengan `docker compose config` dan tes spin-up.
