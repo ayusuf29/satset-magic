@@ -58,6 +58,8 @@ services:
       - ./workspace:/app/workspace
       - ./docs:/app/docs
       - ./tasks:/app/tasks
+      - ./.agents:/app/.agents:ro
+      - ./.agent:/app/.agent:ro
 
   # Frontend Dashboard UI (Next.js Mobile-Friendly)
   dashboard:

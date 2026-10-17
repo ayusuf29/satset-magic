@@ -15,6 +15,7 @@ public class PhaseContext {
     private final String agentRole;
     private final String installedSkills;
     private final String patternsAndTechniques;
+    private final String revisionFeedback;
     private final Instant startTime;
     private final Map<String, Object> attributes;
 
@@ -26,7 +27,8 @@ public class PhaseContext {
             WorkflowState phase,
             String agentRole,
             String installedSkills,
-            String patternsAndTechniques) {
+            String patternsAndTechniques,
+            String revisionFeedback) {
         this.workflowId = workflowId;
         this.projectId = projectId;
         this.taskName = taskName;
@@ -35,6 +37,7 @@ public class PhaseContext {
         this.agentRole = agentRole;
         this.installedSkills = installedSkills;
         this.patternsAndTechniques = patternsAndTechniques;
+        this.revisionFeedback = revisionFeedback;
         this.startTime = Instant.now();
         this.attributes = new HashMap<>();
     }
@@ -47,8 +50,21 @@ public class PhaseContext {
             WorkflowState phase,
             String agentRole,
             String installedSkills,
+            String patternsAndTechniques,
+            String revisionFeedback) {
+        return new PhaseContext(workflowId, projectId, taskName, description, phase, agentRole, installedSkills, patternsAndTechniques, revisionFeedback);
+    }
+
+    public static PhaseContext of(
+            String workflowId,
+            String projectId,
+            String taskName,
+            String description,
+            WorkflowState phase,
+            String agentRole,
+            String installedSkills,
             String patternsAndTechniques) {
-        return new PhaseContext(workflowId, projectId, taskName, description, phase, agentRole, installedSkills, patternsAndTechniques);
+        return new PhaseContext(workflowId, projectId, taskName, description, phase, agentRole, installedSkills, patternsAndTechniques, null);
     }
 
     public String getWorkflowId() { return workflowId; }
@@ -59,6 +75,10 @@ public class PhaseContext {
     public String getAgentRole() { return agentRole; }
     public String getInstalledSkills() { return installedSkills; }
     public String getPatternsAndTechniques() { return patternsAndTechniques; }
+    public String getRevisionFeedback() { return revisionFeedback; }
+    public boolean hasRevisionFeedback() {
+        return revisionFeedback != null && !revisionFeedback.isBlank();
+    }
     public Instant getStartTime() { return startTime; }
     public Map<String, Object> getAttributes() { return attributes; }
 

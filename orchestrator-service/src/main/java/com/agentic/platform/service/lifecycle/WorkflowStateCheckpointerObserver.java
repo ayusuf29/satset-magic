@@ -23,7 +23,7 @@ public class WorkflowStateCheckpointerObserver implements PhaseLifecycleObserver
         workflowRepository.findById(context.getWorkflowId()).ifPresent(wf -> {
             wf.setAgentRunning(true);
             wf.setCurrentAgentRole(context.getAgentRole());
-            wf.setCurrentAgentActivity("Memulai eksekusi pre-task...");
+            wf.setCurrentAgentActivity("Starting phase pre-task execution...");
             wf.setPhaseProgressPercentage(20);
             workflowRepository.save(wf);
             log.info("[CHECKPOINTER OBSERVER: PRE-TASK] Locked UI & checkpointer state for workflow: {}", wf.getId());

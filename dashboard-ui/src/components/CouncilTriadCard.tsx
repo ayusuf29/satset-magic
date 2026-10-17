@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { WorkflowSummary } from "@/lib/types";
 import { Shield, Cpu, Activity, CheckCircle2, XCircle, Clock, Vote, AlertTriangle } from "lucide-react";
 import { submitCouncilReview } from "@/lib/api";
@@ -20,6 +21,21 @@ export function CouncilTriadCard({ workflow, onReviewSubmitted }: CouncilTriadCa
   const [feedback, setFeedback] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [showVotingModal, setShowVotingModal] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (showVotingModal) {
+      const prev = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+      return () => {
+        document.body.style.overflow = prev;
+      };
+    }
+  }, [showVotingModal]);
 
   const isCodeReviewPhase = workflow.currentState === "PHASE_6_CODE_REVIEW";
 
@@ -161,9 +177,17 @@ export function CouncilTriadCard({ workflow, onReviewSubmitted }: CouncilTriadCa
       </div>
 
       {/* Voting Modal */}
-      {showVotingModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150">
-          <div className="w-full max-w-md rounded-2xl glass-panel p-5 border border-slate-700 shadow-2xl relative space-y-4">
+      {showVotingModal && mounted && createPortal(
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowVotingModal(false);
+          }}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl glass-panel p-5 border border-slate-700 shadow-2xl relative space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
             <h4 className="text-sm font-bold text-white flex items-center gap-2">
               <Vote className="h-4 w-4 text-indigo-400" />
               {t.council.voteModalTitle}
@@ -245,7 +269,8 @@ export function CouncilTriadCard({ workflow, onReviewSubmitted }: CouncilTriadCa
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

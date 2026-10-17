@@ -21,7 +21,7 @@ public class WebSocketTelemetryObserver implements PhaseLifecycleObserver {
 
     @Override
     public void onPreTask(PhaseContext context) {
-        String msg = String.format("[%s] Memulai tugas pada fase %s untuk task: %s (Skills: %s)",
+        String msg = String.format("[%s] Initiating phase %s for task: %s (Skills: %s)",
                 context.getAgentRole(), context.getPhase().name(), context.getTaskName(), context.getInstalledSkills());
 
         eventPublisher.publishEvent(AgentEvent.of(
@@ -48,7 +48,7 @@ public class WebSocketTelemetryObserver implements PhaseLifecycleObserver {
 
     @Override
     public void onPostTask(PhaseContext context, PhaseResult result) {
-        String msg = String.format("[%s] Fase %s selesai diselesaikan: %s",
+        String msg = String.format("[%s] Phase %s completed: %s",
                 context.getAgentRole(), context.getPhase().name(), result.getOutputSummary());
 
         eventPublisher.publishEvent(AgentEvent.of(
@@ -62,7 +62,7 @@ public class WebSocketTelemetryObserver implements PhaseLifecycleObserver {
 
     @Override
     public void onTaskFailed(PhaseContext context, Throwable throwable) {
-        String msg = String.format("[%s] Fase %s gagal: %s",
+        String msg = String.format("[%s] Phase %s failed: %s",
                 context.getAgentRole(), context.getPhase().name(), throwable.getMessage());
 
         eventPublisher.publishEvent(AgentEvent.of(

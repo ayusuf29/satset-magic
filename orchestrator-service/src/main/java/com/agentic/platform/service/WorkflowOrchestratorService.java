@@ -1,6 +1,7 @@
 package com.agentic.platform.service;
 
 import com.agentic.platform.domain.model.WorkflowInstance;
+import com.agentic.platform.domain.model.WorkflowState;
 import com.agentic.platform.domain.model.WorkflowTransitionLog;
 
 import java.util.List;
@@ -22,7 +23,12 @@ public interface WorkflowOrchestratorService {
         return handleCouncilReviewResult(workflowId, passed, passed, passed, coveragePercentage, "[" + reviewer + "] " + feedback);
     }
 
-    WorkflowInstance handleHumanDecision(String workflowId, String decision, String comment, String actor);
+    WorkflowInstance handleHumanDecision(String workflowId, String decision, String comment, String actor, WorkflowState targetPhase);
+    default WorkflowInstance handleHumanDecision(String workflowId, String decision, String comment, String actor) {
+        return handleHumanDecision(workflowId, decision, comment, actor, null);
+    }
+    WorkflowInstance revertWorkflowToPhase(String workflowId, WorkflowState targetPhase, String reason, String actor);
+    WorkflowInstance retryCurrentPhase(String workflowId, String reason, String actor);
     void deleteWorkflow(String workflowId);
     void deleteAllWorkflows();
 }

@@ -2,14 +2,20 @@ export type WorkflowState =
   | "PHASE_0_REQUIREMENT_DISCOVERY"
   | "PHASE_0_WAITING_HUMAN_SIGN_OFF"
   | "PHASE_1_ARCHITECTURE_AND_DESIGN"
+  | "PHASE_1_WAITING_HUMAN_APPROVAL"
   | "PHASE_2_BACKLOG_GENERATION"
+  | "PHASE_2_WAITING_HUMAN_APPROVAL"
   | "PHASE_3_TASK_DISPATCHING"
+  | "PHASE_3_WAITING_HUMAN_APPROVAL"
   | "PHASE_4_TDD_PLANNING"
+  | "PHASE_4_WAITING_HUMAN_APPROVAL"
   | "PHASE_5_DEVELOPMENT_IMPLEMENTATION"
+  | "PHASE_5_WAITING_HUMAN_APPROVAL"
   | "PHASE_6_CODE_REVIEW"
   | "PHASE_6_WAITING_HUMAN_CODE_REVIEW_AND_MERGE"
   | "PHASE_6_DEADLOCK_WAITING_HUMAN"
   | "PHASE_7_QA_VERIFICATION"
+  | "PHASE_7_WAITING_HUMAN_APPROVAL"
   | "PHASE_8_READY_FOR_PRODUCTION_GATE"
   | "PHASE_9_RELEASED"
   | "FAILED";
@@ -26,6 +32,8 @@ export interface WorkflowSummary {
   architectApproved?: boolean;
   securityApproved?: boolean;
   performanceApproved?: boolean;
+  lastDecision?: string | null;
+  revisionFeedback?: string | null;
   waitingForHuman: boolean;
   agentRunning?: boolean;
   currentAgentRole?: string;

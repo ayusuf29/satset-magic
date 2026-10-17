@@ -6,6 +6,7 @@ import com.agentic.platform.domain.model.WorkflowState;
 import com.agentic.platform.domain.repository.WorkflowRepository;
 import com.agentic.platform.domain.repository.WorkflowTransitionLogRepository;
 import com.agentic.platform.service.lifecycle.PhaseExecutionManager;
+import com.agentic.platform.service.phase.SdlcJournalService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -38,11 +39,7 @@ class WorkflowOrchestratorServiceTest {
     @Mock
     private NotificationService notificationService;
 
-    @Mock
-    private AgentExecutionService agentExecutionService;
-
-    @Mock
-    private dev.langchain4j.model.chat.ChatLanguageModel chatLanguageModel;
+    private SdlcJournalService journalService = new SdlcJournalService();
 
     private PhaseExecutionManager phaseExecutionManager;
 
@@ -57,9 +54,9 @@ class WorkflowOrchestratorServiceTest {
                 transitionLogRepository,
                 eventPublisher,
                 notificationService,
-                agentExecutionService,
-                chatLanguageModel,
-                phaseExecutionManager
+                phaseExecutionManager,
+                journalService,
+                java.util.Collections.emptyList()
         );
         ReflectionTestUtils.setField(orchestratorService, "maxReviewLoops", 3);
         ReflectionTestUtils.setField(orchestratorService, "minTestCoverage", 70.0);

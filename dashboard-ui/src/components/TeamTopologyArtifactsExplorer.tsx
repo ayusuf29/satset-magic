@@ -24,6 +24,15 @@ import {
   Database,
   Server,
   FileTerminal,
+  Folder,
+  FolderOpen,
+  ChevronRight,
+  ChevronDown,
+  LayoutGrid,
+  ListTree,
+  File,
+  Maximize2,
+  Minimize2,
 } from "lucide-react";
 import { DocumentViewerModal } from "./DocumentViewerModal";
 import { useLanguage } from "@/lib/i18n";
@@ -36,6 +45,7 @@ interface ArtifactItem {
   name: string;
   path: string;
   type: string;
+  sizeBytes?: string;
 }
 
 interface TeamDefinition {
@@ -134,7 +144,7 @@ export interface DocumentClassification {
 export function classifyDocument(filePath: string, language: "en" | "id"): DocumentClassification {
   const p = filePath.toLowerCase().replace(/\\/g, "/");
 
-  // Umum / Lintas Tim
+  // General / Cross-team
   if (p === "sdlc_log.md" || p.endsWith("/sdlc_log.md")) {
     return {
       teamName: "Umum / Lintas Tim",
@@ -195,7 +205,7 @@ export function classifyDocument(filePath: string, language: "en" | "id"): Docum
       badgeClass: "bg-rose-500/20 text-rose-300 border-rose-500/30",
     };
   }
-  if (p.includes("c4_diagrams") || p.includes("c4")) {
+  if (p.includes("c4_model") || p.includes("c4")) {
     return {
       teamName: "Shared Enabling",
       phaseCode: "PHASE_1",
@@ -211,7 +221,7 @@ export function classifyDocument(filePath: string, language: "en" | "id"): Docum
       badgeClass: "bg-purple-500/20 text-purple-300 border-purple-500/30",
     };
   }
-  if (p.includes("phase8-production-readiness") || p.includes("production-readiness")) {
+  if (p.includes("phase8-production-readiness") || p.includes("production-readiness") || p.includes("production_readiness")) {
     return {
       teamName: "Shared Enabling",
       phaseCode: "PHASE_8",
@@ -229,7 +239,7 @@ export function classifyDocument(filePath: string, language: "en" | "id"): Docum
       badgeClass: "bg-violet-500/20 text-violet-300 border-violet-500/30",
     };
   }
-  if (p.includes("phase7-qa-verification") || p.includes("qa-verification") || p.includes("qa-report")) {
+  if (p.includes("phase7-qa-verification") || p.includes("qa_sandbox") || p.includes("qa-report") || p.includes("qa-verification")) {
     return {
       teamName: "CI/CD & Staging",
       phaseCode: "PHASE_7",
@@ -274,7 +284,6 @@ export function classifyDocument(filePath: string, language: "en" | "id"): Docum
     };
   }
 
-  // Fallback
   return {
     teamName: "Umum / Lintas Tim",
     phaseCode: "GENERAL",
@@ -283,13 +292,295 @@ export function classifyDocument(filePath: string, language: "en" | "id"): Docum
   };
 }
 
+function getFileIcon(path: string) {
+  const p = path.toLowerCase();
+  if (p.endsWith(".md")) return <FileText className="h-4 w-4 text-blue-400 flex-shrink-0" />;
+  if (p.endsWith(".java")) return <FileCode className="h-4 w-4 text-orange-400 flex-shrink-0" />;
+  if (p.endsWith(".tsx") || p.endsWith(".ts")) return <Code className="h-4 w-4 text-sky-400 flex-shrink-0" />;
+  if (p.endsWith(".sql")) return <Database className="h-4 w-4 text-cyan-400 flex-shrink-0" />;
+  if (p.endsWith(".json")) return <FileCode className="h-4 w-4 text-emerald-400 flex-shrink-0" />;
+  if (p.endsWith(".yml") || p.endsWith(".yaml")) return <Server className="h-4 w-4 text-rose-400 flex-shrink-0" />;
+  if (p.endsWith(".xml")) return <FileText className="h-4 w-4 text-amber-400 flex-shrink-0" />;
+  if (p.includes("dockerfile")) return <Terminal className="h-4 w-4 text-indigo-400 flex-shrink-0" />;
+  return <File className="h-4 w-4 text-slate-400 flex-shrink-0" />;
+}
+
+function getFolderIcon(folderName: string, isOpen: boolean) {
+  const lower = folderName.toLowerCase();
+  if (lower.startsWith("src") || lower.includes("/src")) {
+    return <Code className="h-4 w-4 text-cyan-400 flex-shrink-0" />;
+  }
+  if (lower.startsWith("test") || lower.includes("/test")) {
+    return <CheckCircle2 className="h-4 w-4 text-emerald-400 flex-shrink-0" />;
+  }
+  if (lower.includes("council") || lower.includes("audit")) {
+    return <ShieldCheck className="h-4 w-4 text-rose-400 flex-shrink-0" />;
+  }
+  if (lower.includes("arch") || lower.includes("c4")) {
+    return <Layers className="h-4 w-4 text-purple-400 flex-shrink-0" />;
+  }
+  if (lower.includes("backlog") || lower.includes("task") || lower.includes("story")) {
+    return <BookOpen className="h-4 w-4 text-blue-400 flex-shrink-0" />;
+  }
+  if (lower.includes("database") || lower.includes("sql") || lower.includes("db")) {
+    return <Database className="h-4 w-4 text-teal-400 flex-shrink-0" />;
+  }
+  if (lower.includes("inference") || lower.includes("prompt")) {
+    return <Sparkles className="h-4 w-4 text-amber-400 flex-shrink-0" />;
+  }
+  return isOpen ? (
+    <FolderOpen className="h-4 w-4 text-amber-400 flex-shrink-0" />
+  ) : (
+    <Folder className="h-4 w-4 text-amber-400 flex-shrink-0" />
+  );
+}
+
+function formatBytes(bytes?: string | number): string {
+  if (!bytes) return "";
+  const b = typeof bytes === "string" ? parseInt(bytes, 10) : bytes;
+  if (isNaN(b) || b <= 0) return "";
+  if (b < 1024) return `${b} B`;
+  if (b < 1024 * 1024) return `${(b / 1024).toFixed(1)} KB`;
+  return `${(b / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+interface ClassifiedArtifactItem extends ArtifactItem {
+  meta: DocumentClassification;
+}
+
+interface FileTreeNode {
+  id: string;
+  name: string;
+  path: string;
+  isFolder: boolean;
+  children: FileTreeNode[];
+  artifact?: ClassifiedArtifactItem;
+  fileCount: number;
+}
+
+function buildFileTree(items: ClassifiedArtifactItem[]): FileTreeNode[] {
+  interface RawFolderNode {
+    id: string;
+    segment: string;
+    children: Record<string, RawFolderNode>;
+    files: ClassifiedArtifactItem[];
+  }
+
+  const root: RawFolderNode = {
+    id: "",
+    segment: "",
+    children: {},
+    files: [],
+  };
+
+  items.forEach((item) => {
+    const normalized = item.path.replace(/\\/g, "/");
+    const parts = normalized.split("/").filter(Boolean);
+    if (parts.length === 0) return;
+
+    let current = root;
+    for (let i = 0; i < parts.length - 1; i++) {
+      const seg = parts[i];
+      const curPath = parts.slice(0, i + 1).join("/");
+      if (!current.children[seg]) {
+        current.children[seg] = {
+          id: curPath,
+          segment: seg,
+          children: {},
+          files: [],
+        };
+      }
+      current = current.children[seg];
+    }
+    current.files.push(item);
+  });
+
+  function convert(folder: RawFolderNode): FileTreeNode[] {
+    const result: FileTreeNode[] = [];
+
+    // Process subfolders
+    Object.keys(folder.children).sort().forEach((childKey) => {
+      let child = folder.children[childKey];
+      let compactedSegment = child.segment;
+      let compactedId = child.id;
+
+      // Compact folder chaining (e.g. main/java/com/agentic)
+      while (child.files.length === 0 && Object.keys(child.children).length === 1) {
+        const onlyChildKey = Object.keys(child.children)[0];
+        const nextChild = child.children[onlyChildKey];
+        compactedSegment = `${compactedSegment}/${nextChild.segment}`;
+        compactedId = nextChild.id;
+        child = nextChild;
+      }
+
+      const subChildren = convert(child);
+      const fileCount = subChildren.reduce((acc, c) => acc + c.fileCount, 0);
+
+      result.push({
+        id: compactedId,
+        name: compactedSegment,
+        path: compactedId,
+        isFolder: true,
+        children: subChildren,
+        fileCount,
+      });
+    });
+
+    // Process files
+    folder.files.sort((a, b) => a.name.localeCompare(b.name)).forEach((file) => {
+      result.push({
+        id: file.path,
+        name: file.name,
+        path: file.path,
+        isFolder: false,
+        children: [],
+        artifact: file,
+        fileCount: 1,
+      });
+    });
+
+    return result.sort((a, b) => {
+      if (a.isFolder && !b.isFolder) return -1;
+      if (!a.isFolder && b.isFolder) return 1;
+      return a.name.localeCompare(b.name);
+    });
+  }
+
+  return convert(root);
+}
+
+function collectAllFolderIds(nodes: FileTreeNode[]): string[] {
+  const ids: string[] = [];
+  function traverse(n: FileTreeNode) {
+    if (n.isFolder) {
+      ids.push(n.id);
+      n.children.forEach(traverse);
+    }
+  }
+  nodes.forEach(traverse);
+  return ids;
+}
+
+function TreeNodeItem({
+  node,
+  level,
+  openFolders,
+  toggleFolder,
+  onSelectFile,
+  searchTerm,
+}: {
+  node: FileTreeNode;
+  level: number;
+  openFolders: Record<string, boolean>;
+  toggleFolder: (id: string) => void;
+  onSelectFile: (path: string, name: string) => void;
+  searchTerm: string;
+}) {
+  if (node.isFolder) {
+    const isOpen = openFolders[node.id] !== false; // default open
+    return (
+      <div className="select-none">
+        <button
+          type="button"
+          onClick={() => toggleFolder(node.id)}
+          style={{ paddingLeft: `${Math.max(level * 16, 6)}px` }}
+          className="w-full flex items-center justify-between py-1.5 pr-2.5 rounded-lg hover:bg-slate-800/60 transition group text-left cursor-pointer"
+        >
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span className="p-0.5 text-slate-500 group-hover:text-slate-300">
+              {isOpen ? (
+                <ChevronDown className="h-3.5 w-3.5" />
+              ) : (
+                <ChevronRight className="h-3.5 w-3.5" />
+              )}
+            </span>
+            {getFolderIcon(node.name, isOpen)}
+            <span className="text-xs font-bold text-slate-200 group-hover:text-white truncate font-mono">
+              {node.name}/
+            </span>
+          </div>
+          <span className="text-[10px] font-mono text-slate-500 bg-slate-900/80 px-2 py-0.5 rounded border border-slate-800/80 flex-shrink-0 ml-2">
+            {node.fileCount} {node.fileCount === 1 ? "file" : "files"}
+          </span>
+        </button>
+
+        {isOpen && node.children.length > 0 && (
+          <div className="border-l border-slate-800/80 ml-3.5 space-y-0.5 mt-0.5">
+            {node.children.map((child) => (
+              <TreeNodeItem
+                key={child.id}
+                node={child}
+                level={level + 1}
+                openFolders={openFolders}
+                toggleFolder={toggleFolder}
+                onSelectFile={onSelectFile}
+                searchTerm={searchTerm}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // File leaf item
+  const item = node.artifact;
+  const isMatch = searchTerm && node.name.toLowerCase().includes(searchTerm.toLowerCase());
+
+  return (
+    <div
+      style={{ paddingLeft: `${Math.max(level * 16, 6)}px` }}
+      onClick={() => onSelectFile(node.path, node.name)}
+      className={`flex items-center justify-between py-1.5 pr-2.5 rounded-lg transition group cursor-pointer ${
+        isMatch
+          ? "bg-blue-950/40 border border-blue-500/40"
+          : "hover:bg-slate-800/50 hover:border-slate-700/50 border border-transparent"
+      }`}
+    >
+      <div className="flex items-center gap-2 min-w-0 flex-1">
+        <span className="w-3.5 flex-shrink-0" />
+        {getFileIcon(node.path)}
+        <span className="text-xs font-medium text-slate-300 group-hover:text-blue-400 transition truncate font-mono">
+          {node.name}
+        </span>
+      </div>
+
+      <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+        {item?.sizeBytes && (
+          <span className="text-[10px] font-mono text-slate-500">
+            {formatBytes(item.sizeBytes)}
+          </span>
+        )}
+        {item?.meta?.badgeClass && (
+          <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${item.meta.badgeClass}`}>
+            {item.meta.phaseCode}
+          </span>
+        )}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onSelectFile(node.path, node.name);
+          }}
+          className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-slate-700 text-slate-400 hover:text-white transition"
+          title="Open Document"
+        >
+          <ExternalLink className="h-3.5 w-3.5" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function TeamTopologyArtifactsExplorer({ workflow }: TeamTopologyArtifactsExplorerProps) {
   const { language, t } = useLanguage();
   const [artifacts, setArtifacts] = useState<ArtifactItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [viewMode, setViewMode] = useState<"tree" | "topology">("tree");
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [selectedTeam, setSelectedTeam] = useState<string | null>(null);
   const [selectedDoc, setSelectedDoc] = useState<{ path: string; title: string } | null>(null);
+  const [openFolders, setOpenFolders] = useState<Record<string, boolean>>({});
 
   const loadArtifacts = async () => {
     if (!workflow?.id) return;
@@ -308,8 +599,15 @@ export function TeamTopologyArtifactsExplorer({ workflow }: TeamTopologyArtifact
     loadArtifacts();
   }, [workflow?.id]);
 
-  // Classify artifacts with Team & Phase metadata
-  const classifiedArtifacts = useMemo(() => {
+  const toggleFolder = (folderKey: string) => {
+    setOpenFolders((prev) => ({
+      ...prev,
+      [folderKey]: prev[folderKey] === false ? true : false,
+    }));
+  };
+
+  // Classify artifacts
+  const classifiedArtifacts = useMemo<ClassifiedArtifactItem[]>(() => {
     return artifacts.map((item) => {
       const meta = classifyDocument(item.path, language);
       return {
@@ -319,7 +617,7 @@ export function TeamTopologyArtifactsExplorer({ workflow }: TeamTopologyArtifact
     });
   }, [artifacts, language]);
 
-  // Count artifacts per team
+  // Counts per team
   const countsByTeam = useMemo(() => {
     const counts: Record<string, number> = {
       "Product & Design": 0,
@@ -339,7 +637,7 @@ export function TeamTopologyArtifactsExplorer({ workflow }: TeamTopologyArtifact
     return counts;
   }, [classifiedArtifacts]);
 
-  // Filter artifacts by selected team and search term
+  // Filter artifacts
   const filteredArtifacts = useMemo(() => {
     return classifiedArtifacts.filter((item) => {
       const matchesSearch =
@@ -349,14 +647,43 @@ export function TeamTopologyArtifactsExplorer({ workflow }: TeamTopologyArtifact
 
       if (!matchesSearch) return false;
 
-      if (!selectedTeam) return true; // Show all teams
+      if (!selectedTeam) return true;
       return item.meta.teamName === selectedTeam;
     });
   }, [classifiedArtifacts, selectedTeam, searchTerm]);
 
-  // Group by team when "Semua Tim" is active
+  // Build recursive tree
+  const fileTree = useMemo(() => {
+    return buildFileTree(filteredArtifacts);
+  }, [filteredArtifacts]);
+
+  // Expand all folders containing matches when search term is active
+  useEffect(() => {
+    if (searchTerm.trim()) {
+      const allIds = collectAllFolderIds(fileTree);
+      const updates: Record<string, boolean> = {};
+      allIds.forEach((id) => (updates[id] = true));
+      setOpenFolders((prev) => ({ ...prev, ...updates }));
+    }
+  }, [searchTerm, fileTree]);
+
+  const handleExpandAll = () => {
+    const allIds = collectAllFolderIds(fileTree);
+    const updates: Record<string, boolean> = {};
+    allIds.forEach((id) => (updates[id] = true));
+    setOpenFolders(updates);
+  };
+
+  const handleCollapseAll = () => {
+    const allIds = collectAllFolderIds(fileTree);
+    const updates: Record<string, boolean> = {};
+    allIds.forEach((id) => (updates[id] = false));
+    setOpenFolders(updates);
+  };
+
+  // Group by team for topology view
   const groupedByTeam = useMemo(() => {
-    const groups: Record<string, typeof filteredArtifacts> = {};
+    const groups: Record<string, ClassifiedArtifactItem[]> = {};
     filteredArtifacts.forEach((item) => {
       if (!groups[item.meta.teamName]) {
         groups[item.meta.teamName] = [];
@@ -366,11 +693,9 @@ export function TeamTopologyArtifactsExplorer({ workflow }: TeamTopologyArtifact
     return groups;
   }, [filteredArtifacts]);
 
-  const currentState = workflow?.currentState || "PHASE_0_REQUIREMENT_DISCOVERY";
-
   return (
     <div className="w-full rounded-2xl glass-panel p-4 sm:p-5 border border-slate-800 space-y-5 shadow-xl shadow-black/30">
-      {/* 1. Header & Quick Actions */}
+      {/* 1. Header & Navigation Controls */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800/80">
         <div className="flex items-center gap-2.5">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600/20 text-blue-400 border border-blue-500/30 flex-shrink-0">
@@ -379,7 +704,7 @@ export function TeamTopologyArtifactsExplorer({ workflow }: TeamTopologyArtifact
           <div>
             <div className="flex items-center gap-2">
               <h3 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
-                {language === "en" ? "5-Team Topology & Project Artifacts" : "5-Team Topology & Berkas Proyek"}
+                {language === "en" ? "Project Artifacts & Code Explorer" : "Eksplorasi Berkas & Kode Proyek"}
               </h3>
               <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-950/70 border border-blue-500/40 text-blue-300 font-semibold">
                 {workflow.projectId || "PRJ-DEFAULT"}
@@ -387,31 +712,60 @@ export function TeamTopologyArtifactsExplorer({ workflow }: TeamTopologyArtifact
             </div>
             <p className="text-[11px] text-slate-400 mt-0.5">
               {language === "en"
-                ? "Click any team card below to filter its phase artifacts, or explore all documents grouped by team."
-                : "Klik kartu tim di bawah untuk memfilter berkas fase kerjanya, atau jelajahi seluruh dokumen per tim."}
+                ? "Browse SDLC specifications, C4 models, test plans, backend Java, frontend React, and manifests."
+                : "Jelajahi spesifikasi SDLC, model C4, rencana uji, Java backend, React frontend, dan manifest."}
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 self-end sm:self-auto">
+        <div className="flex items-center gap-2 self-end sm:self-auto flex-wrap">
+          {/* View Mode Switcher */}
+          <div className="flex items-center p-1 bg-slate-900 border border-slate-800 rounded-xl">
+            <button
+              type="button"
+              onClick={() => setViewMode("tree")}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+                viewMode === "tree"
+                  ? "bg-blue-600 text-white shadow-md shadow-blue-600/30"
+                  : "text-slate-400 hover:text-white"
+              }`}
+            >
+              <ListTree className="h-3.5 w-3.5" />
+              <span>{language === "en" ? "Workspace Tree" : "Pohon Berkas"}</span>
+              <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded font-bold ${viewMode === "tree" ? "bg-blue-700 text-blue-100" : "bg-slate-800 text-slate-400"}`}>
+                {filteredArtifacts.length}
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode("topology")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+                viewMode === "topology"
+                  ? "bg-blue-600 text-white shadow-md shadow-blue-600/30"
+                  : "text-slate-400 hover:text-white"
+              }`}
+            >
+              <LayoutGrid className="h-3.5 w-3.5" />
+              <span>{language === "en" ? "Team Topology" : "Topologi Tim"}</span>
+            </button>
+          </div>
+
           {/* Quick SDLC Journal Button */}
           <button
             type="button"
             onClick={() =>
               setSelectedDoc({
                 path: "SDLC_LOG.md",
-                title:
-                  language === "en"
-                    ? "📘 SDLC Engineering Journal & Rationale (Single Source of Truth)"
-                    : "📘 SDLC Engineering Journal & Rationale (Single Source of Truth)",
+                title: "📘 SDLC Engineering Journal & Rationale",
               })
             }
             className="touch-target inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-md shadow-indigo-600/30 transition"
           >
             <BookOpen className="h-4 w-4" />
-            <span>{language === "en" ? "View SDLC Journal (SDLC_LOG)" : "Lihat Jurnal SDLC (SDLC_LOG)"}</span>
+            <span className="hidden sm:inline">{language === "en" ? "SDLC Journal" : "Jurnal SDLC"}</span>
           </button>
 
+          {/* Refresh Button */}
           <button
             type="button"
             onClick={loadArtifacts}
@@ -423,258 +777,208 @@ export function TeamTopologyArtifactsExplorer({ workflow }: TeamTopologyArtifact
         </div>
       </div>
 
-      {/* 2. Interactive 5-Team Topology Cards Grid */}
-      <div>
-        <div className="flex items-center justify-between mb-2.5">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
-              <Layers className="h-3.5 w-3.5 text-blue-400" />
-              {language === "en" ? "Select Team to Filter Artifacts:" : "Pilih Tim untuk Filter Berkas:"}
-            </span>
-            {selectedTeam && (
-              <span className="text-[11px] px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30 font-medium flex items-center gap-1">
-                <span>{selectedTeam}</span>
-                <button
-                  type="button"
-                  onClick={() => setSelectedTeam(null)}
-                  className="hover:text-white text-blue-400 ml-0.5"
-                  title="Hapus filter"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              </span>
-            )}
-          </div>
-
-          {/* All Teams Filter Reset Pill */}
-          <button
-            type="button"
-            onClick={() => setSelectedTeam(null)}
-            className={`text-xs px-2.5 py-1 rounded-lg border transition font-medium ${
-              selectedTeam === null
-                ? "bg-blue-600/30 border-blue-500 text-blue-200 shadow-sm"
-                : "bg-slate-900/60 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700"
-            }`}
-          >
-            {language === "en" ? "All Teams" : "Semua Tim"} ({artifacts.length})
-          </button>
+      {/* 2. Search & Filter Bar */}
+      <div className="flex items-center justify-between gap-3">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-500" />
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder={
+              language === "en"
+                ? "Search files by name, path or keyword (e.g. .java, .sql, .md)..."
+                : "Cari berkas berdasarkan nama, path atau ekstensi..."
+            }
+            className="w-full pl-9 pr-8 py-1.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 transition"
+          />
+          {searchTerm && (
+            <button
+              onClick={() => setSearchTerm("")}
+              className="absolute right-2.5 top-2.5 text-slate-500 hover:text-white"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
-          {TEAMS.map((team) => {
-            const isSelected = selectedTeam === team.name;
-            const isActive = team.activeInPhases.includes(currentState);
-            const isDeadlock =
-              currentState === "PHASE_6_DEADLOCK_WAITING_HUMAN" && team.name === "Development Team";
-
-            const isWaitingSignOff =
-              (currentState === "PHASE_0_WAITING_HUMAN_SIGN_OFF" && team.name === "Product & Design") ||
-              (currentState === "PHASE_8_READY_FOR_PRODUCTION_GATE" && team.name === "Shared Enabling");
-
-            let statusBadge = t.agentTeams.idle.toUpperCase();
-            let badgeColor = "bg-slate-800 text-slate-400 border-slate-700";
-
-            if (isDeadlock) {
-              statusBadge = "DEADLOCK";
-              badgeColor = "bg-rose-500/20 text-rose-400 border-rose-500/40 animate-pulse";
-            } else if (isWaitingSignOff) {
-              statusBadge = language === "en" ? "WAITING SIGN-OFF" : "MENUNGGU SIGN-OFF";
-              badgeColor = "bg-amber-500/20 text-amber-400 border-amber-500/40 animate-pulse font-semibold";
-            } else if (isActive) {
-              statusBadge = t.agentTeams.running.toUpperCase();
-              badgeColor = "bg-emerald-500/20 text-emerald-400 border-emerald-500/40 animate-pulse";
-            }
-
-            const teamFileCount = countsByTeam[team.name] || 0;
-
-            return (
-              <div
-                key={team.id}
-                onClick={() => setSelectedTeam(isSelected ? null : team.name)}
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    setSelectedTeam(isSelected ? null : team.name);
-                  }
-                }}
-                className={`text-left rounded-xl p-3 sm:p-3.5 border transition-all cursor-pointer relative group ${
-                  isSelected
-                    ? `${team.borderActiveColor} ${team.bgActiveColor} shadow-lg shadow-black/40`
-                    : "bg-slate-950/60 border-slate-800/90 hover:border-slate-700 hover:bg-slate-900/40"
-                }`}
-              >
-                {/* Active Indicator Pin */}
-                {isSelected && (
-                  <div className="absolute -top-1.5 -right-1.5 bg-blue-500 text-white rounded-full p-0.5 shadow-md">
-                    <CheckCircle2 className="h-3 w-3" />
-                  </div>
-                )}
-
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <div className="p-1.5 rounded-lg bg-slate-900 border border-slate-800/80">
-                      {team.icon}
-                    </div>
-                    <div>
-                      <h4 className="text-xs font-bold text-white leading-tight">{team.name}</h4>
-                      <span className="text-[10px] text-slate-400">{team.category}</span>
-                    </div>
-                  </div>
-                  <span
-                    className={`text-[9px] font-mono px-1.5 py-0.5 rounded border font-semibold ${badgeColor}`}
-                  >
-                    {statusBadge}
-                  </span>
-                </div>
-
-                <div className="mt-2 pt-2 border-t border-slate-900 space-y-1.5">
-                  <p className="text-[11px] font-medium text-slate-300 truncate">{team.leadRole}</p>
-                  <div className="flex flex-wrap gap-1">
-                    {team.members.map((member, i) => (
-                      <span
-                        key={i}
-                        className="text-[9px] px-1.5 py-0.5 rounded bg-slate-900 border border-slate-800/80 text-slate-400 truncate max-w-[120px]"
-                      >
-                        {member}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Team File Count Footer */}
-                <div className="mt-2.5 pt-1.5 border-t border-slate-900/80 flex items-center justify-between text-[10px]">
-                  <span className="text-slate-400 flex items-center gap-1">
-                    📁 {teamFileCount} {language === "en" ? "artifacts" : "berkas"}
-                  </span>
-                  <span
-                    className={`font-semibold ${
-                      isSelected ? "text-blue-300 font-bold" : "text-slate-500 group-hover:text-slate-300"
-                    }`}
-                  >
-                    {isSelected ? (language === "en" ? "Active" : "Aktif") : (language === "en" ? "Filter" : "Pilih")} →
-                  </span>
-                </div>
-              </div>
-            );
-          })}
+        <div className="text-xs text-slate-400 font-mono">
+          {filteredArtifacts.length} {language === "en" ? "files in workspace" : "berkas di workspace"}
         </div>
       </div>
 
-      {/* 3. Berkas Workspace List with Search & Phase Labels */}
-      <div className="space-y-3 pt-2 border-t border-slate-800/70">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold text-slate-200">
-              {selectedTeam
-                ? `${language === "en" ? "Artifacts for" : "Berkas Tim"}: ${selectedTeam}`
-                : language === "en"
-                ? "All Workspace Artifacts (Grouped by Team)"
-                : "Semua Berkas Workspace (Dikelompokkan per Tim)"}
+      {/* 3A. View Mode: WORKSPACE TREE (True Hierarchical IDE View) */}
+      {viewMode === "tree" && (
+        <div className="rounded-xl border border-slate-800 bg-[#090d16] font-mono text-xs overflow-hidden shadow-inner">
+          {/* Tree Navigation Bar */}
+          <div className="px-4 py-2.5 bg-slate-900/90 border-b border-slate-800 flex items-center justify-between flex-wrap gap-2">
+            <span className="font-semibold text-slate-300 flex items-center gap-2">
+              <Folder className="h-4 w-4 text-blue-400 flex-shrink-0" />
+              <span>workspace/projects/{workflow.projectId || "PRJ-DEFAULT"}/</span>
             </span>
-            <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-slate-400">
-              {filteredArtifacts.length} {language === "en" ? "files" : "berkas"}
-            </span>
-          </div>
-
-          {/* Search Box */}
-          <div className="relative w-full sm:w-72">
-            <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-500" />
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder={
-                selectedTeam
-                  ? `${language === "en" ? "Search in" : "Cari di"} ${selectedTeam}...`
-                  : t.artifacts.searchPlaceholder
-              }
-              className="w-full pl-8 pr-4 py-1.5 rounded-xl bg-slate-950/80 border border-slate-800 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500"
-            />
-            {searchTerm && (
+            <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={() => setSearchTerm("")}
-                className="absolute right-2.5 top-2.5 text-slate-500 hover:text-white"
+                onClick={handleExpandAll}
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-medium border border-slate-700 transition"
+                title="Expand All Folders"
               >
-                <X className="h-3 w-3" />
+                <Maximize2 className="h-3 w-3 text-blue-400" />
+                <span>{language === "en" ? "Expand All" : "Buka Semua"}</span>
               </button>
+              <button
+                type="button"
+                onClick={handleCollapseAll}
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-medium border border-slate-700 transition"
+                title="Collapse All Folders"
+              >
+                <Minimize2 className="h-3 w-3 text-slate-400" />
+                <span>{language === "en" ? "Collapse All" : "Tutup Semua"}</span>
+              </button>
+              <span className="text-[11px] text-slate-500 bg-slate-950 px-2 py-0.5 rounded border border-slate-800 font-mono">
+                {filteredArtifacts.length} total files
+              </span>
+            </div>
+          </div>
+
+          {/* Tree Contents */}
+          <div className="p-3 space-y-0.5">
+            {fileTree.length === 0 ? (
+              <div className="py-12 text-center text-slate-500">
+                <Folder className="h-8 w-8 mx-auto mb-2 text-slate-600" />
+                <p className="text-xs">{t.artifacts.empty}</p>
+              </div>
+            ) : (
+              fileTree.map((node) => (
+                <TreeNodeItem
+                  key={node.id}
+                  node={node}
+                  level={0}
+                  openFolders={openFolders}
+                  toggleFolder={toggleFolder}
+                  onSelectFile={(path, name) => setSelectedDoc({ path, title: name })}
+                  searchTerm={searchTerm}
+                />
+              ))
             )}
           </div>
         </div>
+      )}
 
-        {/* Content Section */}
-        {loading ? (
-          <div className="py-12 text-center text-xs text-slate-500 flex flex-col items-center gap-2">
-            <RefreshCw className="h-5 w-5 animate-spin text-blue-500" />
-            <span>{t.artifacts.loading}</span>
-          </div>
-        ) : filteredArtifacts.length === 0 ? (
-          <div className="py-12 text-center text-xs text-slate-500 rounded-xl bg-slate-950/40 border border-slate-900 space-y-2">
-            <p>{t.artifacts.empty}</p>
-            {selectedTeam && (
-              <button
-                type="button"
-                onClick={() => setSelectedTeam(null)}
-                className="text-blue-400 hover:underline text-xs"
-              >
-                {language === "en" ? "Clear team filter to view all" : "Reset filter tim untuk melihat semua"}
-              </button>
-            )}
-          </div>
-        ) : selectedTeam ? (
-          /* Render Flat Grid When A Specific Team Is Selected */
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 max-h-[420px] overflow-y-auto pr-1">
-            {filteredArtifacts.map((item) => (
-              <ArtifactCard
-                key={item.path}
-                item={item}
-                onSelect={(doc) => setSelectedDoc(doc)}
-                language={language}
-              />
-            ))}
-          </div>
-        ) : (
-          /* Render Grouped by Team When "Semua Tim" Is Active */
-          <div className="space-y-4 max-h-[500px] overflow-y-auto pr-1">
-            {Object.entries(groupedByTeam).map(([teamName, items]) => {
-              if (items.length === 0) return null;
+      {/* 3B. View Mode: TEAM TOPOLOGY (Grouped by Folder per Team) */}
+      {viewMode === "topology" && (
+        <div className="space-y-5">
+          {/* Team Cards Grid */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
+            {TEAMS.map((team) => {
+              const isSelected = selectedTeam === team.name;
+              const count = countsByTeam[team.name] || 0;
 
               return (
-                <div key={teamName} className="space-y-2">
-                  <div className="flex items-center gap-2 pb-1 border-b border-slate-800/60">
-                    <span className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
-                      {teamName === "Product & Design" && <Users className="h-3.5 w-3.5 text-blue-400" />}
-                      {teamName === "Development Team" && <Code className="h-3.5 w-3.5 text-emerald-400" />}
-                      {teamName === "CI/CD & Staging" && <Terminal className="h-3.5 w-3.5 text-indigo-400" />}
-                      {teamName === "Production & SRE" && <Activity className="h-3.5 w-3.5 text-amber-400" />}
-                      {teamName === "Shared Enabling" && <ShieldAlert className="h-3.5 w-3.5 text-rose-400" />}
-                      {teamName === "Umum / Lintas Tim" && <FolderTree className="h-3.5 w-3.5 text-indigo-400" />}
-                      <span>{teamName}</span>
-                    </span>
-                    <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-slate-900 border border-slate-800 text-slate-400 font-semibold">
-                      {items.length} {language === "en" ? "files" : "berkas"}
+                <button
+                  key={team.id}
+                  type="button"
+                  onClick={() => setSelectedTeam(isSelected ? null : team.name)}
+                  className={`text-left p-3 rounded-xl border transition-all ${
+                    isSelected
+                      ? `${team.borderActiveColor} ${team.bgActiveColor} shadow-lg`
+                      : "border-slate-800 bg-slate-900/50 hover:border-slate-700 hover:bg-slate-900"
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="p-1.5 rounded-lg bg-slate-800/80">{team.icon}</div>
+                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 font-bold">
+                      {count}
                     </span>
                   </div>
+                  <h4 className="text-xs font-bold text-white truncate">{team.name}</h4>
+                  <p className="text-[10px] text-slate-400 truncate mt-0.5">{team.leadRole}</p>
+                </button>
+              );
+            })}
+          </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
-                    {items.map((item) => (
-                      <ArtifactCard
-                        key={item.path}
-                        item={item}
-                        onSelect={(doc) => setSelectedDoc(doc)}
-                        language={language}
-                      />
+          {/* Grouped Artifacts with Directory Subheaders */}
+          <div className="space-y-4">
+            {Object.entries(groupedByTeam).map(([teamName, items]) => {
+              // Group items by directory within team
+              const itemsByDir: Record<string, ClassifiedArtifactItem[]> = {};
+              items.forEach((item) => {
+                const parts = item.path.replace(/\\/g, "/").split("/");
+                const dir = parts.length > 1 ? parts.slice(0, parts.length - 1).join("/") : "root";
+                if (!itemsByDir[dir]) itemsByDir[dir] = [];
+                itemsByDir[dir].push(item);
+              });
+
+              return (
+                <div key={teamName} className="rounded-xl border border-slate-800/70 bg-slate-900/30 overflow-hidden">
+                  <div className="px-3.5 py-2 bg-slate-900/80 border-b border-slate-800 flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-200 flex items-center gap-2">
+                      <span className="h-2 w-2 rounded-full bg-blue-500" />
+                      {teamName}
+                    </span>
+                    <span className="text-[11px] font-mono text-slate-500">{items.length} files</span>
+                  </div>
+
+                  <div className="divide-y divide-slate-800/40">
+                    {Object.entries(itemsByDir).map(([dirPath, dirItems]) => (
+                      <div key={dirPath} className="space-y-0.5">
+                        <div className="px-3.5 py-1.5 bg-slate-950/60 flex items-center gap-2 text-[11px] font-mono text-slate-400 border-b border-slate-800/40">
+                          <Folder className="h-3.5 w-3.5 text-amber-400/80" />
+                          <span className="font-semibold text-slate-300">{dirPath}/</span>
+                          <span className="text-[10px] text-slate-500">({dirItems.length})</span>
+                        </div>
+
+                        {dirItems.map((item) => (
+                          <div
+                            key={item.path}
+                            className="px-3.5 py-2 hover:bg-slate-800/40 transition flex items-center justify-between gap-3 group"
+                          >
+                            <button
+                              type="button"
+                              onClick={() => setSelectedDoc({ path: item.path, title: item.name })}
+                              className="flex items-center gap-2.5 min-w-0 text-left flex-1"
+                            >
+                              {getFileIcon(item.path)}
+                              <div className="min-w-0">
+                                <p className="text-xs font-semibold text-slate-200 group-hover:text-blue-400 transition truncate">
+                                  {item.name}
+                                </p>
+                                <p className="text-[10px] font-mono text-slate-500 truncate">{item.path}</p>
+                              </div>
+                            </button>
+
+                            <div className="flex items-center gap-2 flex-shrink-0">
+                              {item.sizeBytes && (
+                                <span className="text-[10px] font-mono text-slate-500">
+                                  {formatBytes(item.sizeBytes)}
+                                </span>
+                              )}
+                              <span className={`text-[10px] font-mono px-2 py-0.5 rounded border ${item.meta.badgeClass}`}>
+                                {item.meta.phaseCode}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => setSelectedDoc({ path: item.path, title: item.name })}
+                                className="p-1 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition"
+                                title="Open file viewer"
+                              >
+                                <ExternalLink className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     ))}
                   </div>
                 </div>
               );
             })}
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
-      {/* 4. Document Viewer Modal */}
+      {/* Document & Code Viewer Modal */}
       {selectedDoc && (
         <DocumentViewerModal
           isOpen={!!selectedDoc}
@@ -684,91 +988,6 @@ export function TeamTopologyArtifactsExplorer({ workflow }: TeamTopologyArtifact
           title={selectedDoc.title}
         />
       )}
-    </div>
-  );
-}
-
-interface ArtifactCardProps {
-  item: ArtifactItem & { meta: DocumentClassification };
-  onSelect: (doc: { path: string; title: string }) => void;
-  language: "en" | "id";
-}
-
-function ArtifactCard({ item, onSelect, language }: ArtifactCardProps) {
-  const isSdlcLog = item.name === "SDLC_LOG.md";
-  const isThreatModel = item.name.includes("threat-model");
-  const isGherkin = item.name.includes("GHERKIN");
-  const isSql = item.name.endsWith(".sql");
-  const isDocker = item.name.includes("docker");
-
-  return (
-    <div
-      className={`flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-xl border transition-all gap-2.5 ${
-        isSdlcLog
-          ? "bg-indigo-950/30 border-indigo-500/40 hover:border-indigo-500/60"
-          : "bg-slate-950/60 border-slate-800/90 hover:border-slate-700 hover:bg-slate-900/40"
-      }`}
-    >
-      <div className="flex items-start gap-2.5 min-w-0 pr-1">
-        {/* Document Icon */}
-        <div
-          className={`flex h-8 w-8 items-center justify-center rounded-lg flex-shrink-0 mt-0.5 ${
-            isSdlcLog
-              ? "bg-indigo-500/20 text-indigo-400"
-              : isThreatModel
-              ? "bg-rose-500/20 text-rose-400"
-              : isGherkin
-              ? "bg-blue-500/20 text-blue-400"
-              : isSql
-              ? "bg-cyan-500/20 text-cyan-400"
-              : isDocker
-              ? "bg-amber-500/20 text-amber-400"
-              : "bg-slate-800 text-slate-300"
-          }`}
-        >
-          {isSdlcLog ? (
-            <BookOpen className="h-4 w-4" />
-          ) : isThreatModel ? (
-            <ShieldCheck className="h-4 w-4" />
-          ) : isSql ? (
-            <Database className="h-4 w-4" />
-          ) : isDocker ? (
-            <Server className="h-4 w-4" />
-          ) : (
-            <FileText className="h-4 w-4" />
-          )}
-        </div>
-
-        <div className="min-w-0">
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <p className="text-xs font-semibold text-slate-100 truncate">{item.name}</p>
-            {/* Phase Badge */}
-            <span
-              className={`text-[9px] font-medium px-1.5 py-0.5 rounded border ${item.meta.badgeClass}`}
-            >
-              {item.meta.phaseLabel}
-            </span>
-          </div>
-          <p className="text-[10px] font-mono text-slate-500 truncate mt-0.5">{item.path}</p>
-        </div>
-      </div>
-
-      {/* Open Button */}
-      <button
-        type="button"
-        onClick={() =>
-          onSelect({
-            path: item.path,
-            title: isSdlcLog
-              ? "📘 SDLC Engineering Journal & Rationale (Single Source of Truth)"
-              : `📄 ${item.name}`,
-          })
-        }
-        className="touch-target inline-flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg bg-blue-600/20 hover:bg-blue-600/40 text-blue-300 border border-blue-500/30 text-[11px] font-medium transition flex-shrink-0 self-end sm:self-auto"
-      >
-        <ExternalLink className="h-3 w-3" />
-        <span>{language === "en" ? "Open / View" : "Buka / Unduh"}</span>
-      </button>
     </div>
   );
 }

@@ -44,36 +44,42 @@ public class NotificationServiceImpl implements NotificationService {
 
             boolean isMergeGate = workflow.getCurrentState() == com.agentic.platform.domain.model.WorkflowState.PHASE_6_WAITING_HUMAN_CODE_REVIEW_AND_MERGE;
 
+            String escapedWorkflowId = escapeHtml(workflow.getId());
+            String escapedTaskName = escapeHtml(workflow.getTaskName());
+            String escapedState = escapeHtml(workflow.getCurrentState() != null ? workflow.getCurrentState().name() : "");
+            String escapedReason = escapeHtml(reason);
+
             String messageText;
             if (isMergeGate) {
                 messageText = String.format(
-                        "🚀 *CODE REVIEW APPROVAL & PROTECTED MERGE*\n\n" +
-                        "🔹 *Workflow ID:* `%s`\n" +
-                        "🔹 *Task Name:* *%s*\n" +
-                        "🔹 *State:* `%s`\n" +
-                        "🌿 *Target:* `main` branch (PROTECTED)\n" +
-                        "🏛️ *Council Status:* 3/3 UNANIMOUS PASS (Coverage: %.1f%%)\n" +
-                        "🔹 *Reason:* %s\n\n" +
-                        "⚠️ *Aturan Keamanan:* Agen dilarang merge langsung ke branch `main`. Otorisasi pimpinan teknis (manusia) diperlukan:",
-                        workflow.getId(),
-                        workflow.getTaskName(),
-                        workflow.getCurrentState(),
+                        "🚀 <b>CODE REVIEW APPROVAL &amp; PROTECTED MERGE</b>\n\n" +
+                        "🔹 <b>Workflow ID:</b> <code>%s</code>\n" +
+                        "🔹 <b>Task Name:</b> <b>%s</b>\n" +
+                        "🔹 <b>Current Phase:</b> <code>%s</code>\n" +
+                        "🌿 <b>Target:</b> <code>main</code> branch (PROTECTED)\n" +
+                        "🏛️ <b>Council Status:</b> 3/3 UNANIMOUS PASS (Coverage: %.1f%%)\n" +
+                        "🔹 <b>Reason:</b> %s\n\n" +
+                        "🔔 <i>Agent is waiting for your action in the dashboard.</i>\n\n" +
+                        "⚠️ <b>Aturan Keamanan:</b> Agen dilarang merge langsung ke branch <code>main</code>. Otorisasi pimpinan teknis (manusia) diperlukan:",
+                        escapedWorkflowId,
+                        escapedTaskName,
+                        escapedState,
                         workflow.getCoveragePercentage(),
-                        reason
+                        escapedReason
                 );
             } else {
                 messageText = String.format(
-                        "⚠️ *HUMAN APPROVAL REQUIRED*\n\n" +
-                        "🔹 *Workflow ID:* `%s`\n" +
-                        "🔹 *Task Name:* *%s*\n" +
-                        "🔹 *State:* `%s`\n" +
-                        "🔹 *Reason:* %s\n" +
-                        "🔹 *Review Loop:* %d / 3\n\n" +
-                        "Pilih keputusan di bawah atau tinjau langsung di Dashboard:",
-                        workflow.getId(),
-                        workflow.getTaskName(),
-                        workflow.getCurrentState(),
-                        reason,
+                        "⚠️ <b>HUMAN APPROVAL REQUIRED</b>\n\n" +
+                        "🔹 <b>Workflow ID:</b> <code>%s</code>\n" +
+                        "🔹 <b>Task Name:</b> <b>%s</b>\n" +
+                        "🔹 <b>Current Phase:</b> <code>%s</code>\n" +
+                        "🔹 <b>Reason:</b> %s\n" +
+                        "🔹 <b>Review Loop:</b> %d / 3\n\n" +
+                        "🔔 <i>Agent is waiting for your action in the dashboard.</i>",
+                        escapedWorkflowId,
+                        escapedTaskName,
+                        escapedState,
+                        escapedReason,
                         workflow.getReviewLoopCount()
                 );
             }
@@ -86,20 +92,15 @@ public class NotificationServiceImpl implements NotificationService {
                     "text", isMergeGate ? "❌ REJECT WITH NOTE" : "❌ REJECT",
                     "callback_data", "reject:" + workflow.getId()
             );
-            Map<String, Object> viewDetailButton = Map.of(
-                    "text", "📝 VIEW DETAIL",
-                    "url", dashboardUrl + "/workflow/" + workflow.getId()
-            );
 
             List<List<Map<String, Object>>> keyboard = List.of(
-                    List.of(approveButton, rejectButton),
-                    List.of(viewDetailButton)
+                    List.of(approveButton, rejectButton)
             );
 
             Map<String, Object> requestPayload = Map.of(
                     "chat_id", chatId,
                     "text", messageText,
-                    "parse_mode", "Markdown",
+                    "parse_mode", "HTML",
                     "reply_markup", Map.of("inline_keyboard", keyboard)
             );
 
@@ -107,8 +108,22 @@ public class NotificationServiceImpl implements NotificationService {
             headers.setContentType(MediaType.APPLICATION_JSON);
             HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestPayload, headers);
 
-            restTemplate.postForEntity(telegramUrl, entity, String.class);
-            log.info("Telegram approval alert successfully dispatched to chat_id: {}", chatId);
+            try {
+                restTemplate.postForEntity(telegramUrl, entity, String.class);
+                log.info("Telegram approval alert successfully dispatched to chat_id: {}", chatId);
+            } catch (Exception ex) {
+                log.warn("HTML Telegram dispatch failed ({}), attempting plain text fallback...", ex.getMessage());
+                // Fallback to plain text without parse_mode to guarantee delivery
+                String plainText = stripHtml(messageText);
+                Map<String, Object> fallbackPayload = Map.of(
+                        "chat_id", chatId,
+                        "text", plainText,
+                        "reply_markup", Map.of("inline_keyboard", keyboard)
+                );
+                HttpEntity<Map<String, Object>> fallbackEntity = new HttpEntity<>(fallbackPayload, headers);
+                restTemplate.postForEntity(telegramUrl, fallbackEntity, String.class);
+                log.info("Telegram approval alert successfully dispatched via plain text fallback to chat_id: {}", chatId);
+            }
         } catch (Exception ex) {
             if (ex.getMessage() != null && ex.getMessage().contains("chat not found")) {
                 log.warn("Telegram Notice: Bot (@SatsetMagicBot) belum di-start oleh chat_id {}. Buka Telegram, cari @SatsetMagicBot lalu klik /start agar notifikasi terkirim.", chatId);
@@ -121,5 +136,38 @@ public class NotificationServiceImpl implements NotificationService {
     @Override
     public void sendEmergencyAlert(String subject, String details) {
         log.error("EMERGENCY ALERT: [{}] - {}", subject, details);
+        if (botToken == null || botToken.isBlank() || chatId == null || chatId.isBlank()) {
+            return;
+        }
+        try {
+            String telegramUrl = "https://api.telegram.org/bot" + botToken + "/sendMessage";
+            String msg = String.format("🚨 <b>EMERGENCY ALERT</b>\n\n<b>Subject:</b> %s\n<b>Details:</b> %s",
+                    escapeHtml(subject), escapeHtml(details));
+            Map<String, Object> payload = Map.of(
+                    "chat_id", chatId,
+                    "text", msg,
+                    "parse_mode", "HTML"
+            );
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            restTemplate.postForEntity(telegramUrl, new HttpEntity<>(payload, headers), String.class);
+        } catch (Exception e) {
+            log.warn("Failed to send emergency Telegram alert: {}", e.getMessage());
+        }
+    }
+
+    private String escapeHtml(String text) {
+        if (text == null) return "";
+        return text.replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;");
+    }
+
+    private String stripHtml(String html) {
+        if (html == null) return "";
+        return html.replaceAll("<[^>]*>", "")
+                .replace("&amp;", "&")
+                .replace("&lt;", "<")
+                .replace("&gt;", ">");
     }
 }

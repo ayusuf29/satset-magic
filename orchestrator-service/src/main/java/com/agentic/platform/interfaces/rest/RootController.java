@@ -20,7 +20,6 @@ public class RootController {
                 "endpoints", Map.of(
                         "workflows", "/api/workflow",
                         "workflowStream", "/api/workflow/stream",
-                        "inventory", "/api/inventory",
                         "h2Console", "/h2-console",
                         "dashboardUI", "http://localhost:3000"
                 ),

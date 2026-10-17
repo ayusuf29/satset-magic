@@ -100,8 +100,8 @@ public class TelegramWebhookController {
                 orchestratorService.handleHumanDecision(workflowId, "APPROVE", comment, "TELEGRAM:@" + username);
 
                 String cardText = isMergeGate
-                        ? String.format("✅ *PR DISANGGUPKAN & MERGED KE MAIN BRANCH*\n\n🔹 *Workflow ID:* `%s`\n🔹 *Task:* %s\n🔹 *Otorisator:* @%s\n🌿 Branch `main` telah diperbarui & melanjutkan ke QA Sandbox.", workflowId, currentWf.getTaskName(), username)
-                        : String.format("✅ *KEPUTUSAN: DISETUJUI*\n\n🔹 *Workflow ID:* `%s`\n🔹 *Otorisator:* @%s\nWorkflow resmi dilanjutkan ke fase berikutnya.", workflowId, username);
+                        ? String.format("✅ <b>PR DISANGGUPKAN &amp; MERGED KE MAIN BRANCH</b>\n\n🔹 <b>Workflow ID:</b> <code>%s</code>\n🔹 <b>Task:</b> %s\n🔹 <b>Otorisator:</b> @%s\n🌿 Branch <code>main</code> telah diperbarui &amp; melanjutkan ke QA Sandbox.", escapeHtml(workflowId), escapeHtml(currentWf.getTaskName()), escapeHtml(username))
+                        : String.format("✅ <b>KEPUTUSAN: DISETUJUI</b>\n\n🔹 <b>Workflow ID:</b> <code>%s</code>\n🔹 <b>Otorisator:</b> @%s\nWorkflow resmi dilanjutkan ke fase berikutnya.", escapeHtml(workflowId), escapeHtml(username));
 
                 if (messageId != null && chatId != null) {
                     updateTelegramCard(chatId, messageId, cardText);
@@ -113,7 +113,7 @@ public class TelegramWebhookController {
                 String comment = "Ditolak via Telegram oleh @" + username;
                 orchestratorService.handleHumanDecision(workflowId, "REJECT", comment, "TELEGRAM:@" + username);
 
-                String cardText = String.format("❌ *KEPUTUSAN: DITOLAK*\n\n🔹 *Workflow ID:* `%s`\n🔹 *Otorisator:* @%s\nTugas dikembalikan ke Developer Agent untuk diperbaiki.", workflowId, username);
+                String cardText = String.format("❌ <b>KEPUTUSAN: DITOLAK</b>\n\n🔹 <b>Workflow ID:</b> <code>%s</code>\n🔹 <b>Otorisator:</b> @%s\nTugas dikembalikan ke Developer Agent untuk diperbaiki.", escapeHtml(workflowId), escapeHtml(username));
 
                 if (messageId != null && chatId != null) {
                     updateTelegramCard(chatId, messageId, cardText);
@@ -151,17 +151,28 @@ public class TelegramWebhookController {
 
     private void updateTelegramCard(String chatId, Integer messageId, String newText) {
         if (botToken == null || botToken.isBlank()) return;
+        String url = "https://api.telegram.org/bot" + botToken + "/editMessageText";
         try {
-            String url = "https://api.telegram.org/bot" + botToken + "/editMessageText";
             Map<String, Object> body = Map.of(
                     "chat_id", chatId,
                     "message_id", messageId,
                     "text", newText,
-                    "parse_mode", "Markdown"
+                    "parse_mode", "HTML"
             );
             postJson(url, body);
         } catch (Exception ex) {
-            log.warn("Failed to edit Telegram message text: {}", ex.getMessage());
+            log.warn("Failed to edit Telegram message text in HTML, retrying plain text: {}", ex.getMessage());
+            try {
+                String plain = newText.replaceAll("<[^>]*>", "").replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">");
+                Map<String, Object> body = Map.of(
+                        "chat_id", chatId,
+                        "message_id", messageId,
+                        "text", plain
+                );
+                postJson(url, body);
+            } catch (Exception e2) {
+                log.warn("Failed to edit Telegram message text in plain text: {}", e2.getMessage());
+            }
         }
     }
 
@@ -170,5 +181,12 @@ public class TelegramWebhookController {
         headers.setContentType(MediaType.APPLICATION_JSON);
         HttpEntity<Map<String, Object>> entity = new HttpEntity<>(payload, headers);
         restTemplate.postForEntity(url, entity, String.class);
+    }
+
+    private String escapeHtml(String text) {
+        if (text == null) return "";
+        return text.replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;");
     }
 }

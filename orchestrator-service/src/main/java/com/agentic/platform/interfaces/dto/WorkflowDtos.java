@@ -18,9 +18,10 @@ public class WorkflowDtos {
     ) {}
 
     public record HumanDecisionRequest(
-        String decision, // "APPROVE" or "REJECT"
+        String decision, // "APPROVE" or "RETURN" (or legacy "REJECT")
         String comment,
-        String actor
+        String actor,
+        WorkflowState targetPhase
     ) {}
 
     public record CouncilReviewResultRequest(
@@ -48,6 +49,7 @@ public class WorkflowDtos {
         boolean securityApproved,
         boolean performanceApproved,
         String lastDecision,
+        String revisionFeedback,
         boolean waitingForHuman,
         boolean agentRunning,
         String currentAgentRole,
@@ -70,6 +72,7 @@ public class WorkflowDtos {
                 entity.isSecurityApproved(),
                 entity.isPerformanceApproved(),
                 entity.getLastDecision(),
+                entity.getRevisionFeedback(),
                 entity.getCurrentState().isHumanGate(),
                 entity.isAgentRunning(),
                 entity.getCurrentAgentRole(),
@@ -95,6 +98,7 @@ public class WorkflowDtos {
         boolean performanceApproved,
         String payloadJson,
         String lastDecision,
+        String revisionFeedback,
         boolean waitingForHuman,
         boolean agentRunning,
         String currentAgentRole,
@@ -119,6 +123,7 @@ public class WorkflowDtos {
                 entity.isPerformanceApproved(),
                 entity.getPayloadJson(),
                 entity.getLastDecision(),
+                entity.getRevisionFeedback(),
                 entity.getCurrentState().isHumanGate(),
                 entity.isAgentRunning(),
                 entity.getCurrentAgentRole(),

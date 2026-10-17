@@ -77,9 +77,20 @@ public class WorkflowController {
     public ResponseEntity<WorkflowSummaryResponse> approveWorkflow(
             @PathVariable String id,
             @RequestBody(required = false) HumanDecisionRequest request) {
-        String comment = request != null && request.comment() != null ? request.comment() : "Human approved via dashboard";
+        String comment = request != null && request.comment() != null ? request.comment() : "Disetujui oleh operator via dashboard";
         String actor = request != null && request.actor() != null ? request.actor() : "HUMAN_OPERATOR";
-        WorkflowInstance updated = orchestratorService.handleHumanDecision(id, "APPROVE", comment, actor);
+        WorkflowInstance updated = orchestratorService.handleHumanDecision(id, "APPROVE", comment, actor, null);
+        return ResponseEntity.ok(WorkflowSummaryResponse.from(updated));
+    }
+
+    @PostMapping("/{id}/return")
+    public ResponseEntity<WorkflowSummaryResponse> returnWorkflow(
+            @PathVariable String id,
+            @RequestBody(required = false) HumanDecisionRequest request) {
+        String comment = request != null && request.comment() != null ? request.comment() : "Dikembalikan untuk revisi oleh operator";
+        String actor = request != null && request.actor() != null ? request.actor() : "HUMAN_OPERATOR";
+        com.agentic.platform.domain.model.WorkflowState targetPhase = request != null ? request.targetPhase() : null;
+        WorkflowInstance updated = orchestratorService.handleHumanDecision(id, "RETURN", comment, actor, targetPhase);
         return ResponseEntity.ok(WorkflowSummaryResponse.from(updated));
     }
 
@@ -87,9 +98,25 @@ public class WorkflowController {
     public ResponseEntity<WorkflowSummaryResponse> rejectWorkflow(
             @PathVariable String id,
             @RequestBody(required = false) HumanDecisionRequest request) {
-        String comment = request != null && request.comment() != null ? request.comment() : "Human rejected via dashboard";
-        String actor = request != null && request.actor() != null ? request.actor() : "HUMAN_OPERATOR";
-        WorkflowInstance updated = orchestratorService.handleHumanDecision(id, "REJECT", comment, actor);
+        return returnWorkflow(id, request);
+    }
+
+    @PostMapping("/{id}/revert-phase")
+    public ResponseEntity<WorkflowSummaryResponse> revertWorkflowPhase(
+            @PathVariable String id,
+            @RequestParam com.agentic.platform.domain.model.WorkflowState targetPhase,
+            @RequestParam(required = false, defaultValue = "Reverted by operator") String reason,
+            @RequestParam(required = false, defaultValue = "HUMAN_OPERATOR") String actor) {
+        WorkflowInstance updated = orchestratorService.revertWorkflowToPhase(id, targetPhase, reason, actor);
+        return ResponseEntity.ok(WorkflowSummaryResponse.from(updated));
+    }
+
+    @PostMapping("/{id}/retry")
+    public ResponseEntity<WorkflowSummaryResponse> retryCurrentPhase(
+            @PathVariable String id,
+            @RequestParam(required = false, defaultValue = "Execution retried by operator") String reason,
+            @RequestParam(required = false, defaultValue = "HUMAN_OPERATOR") String actor) {
+        WorkflowInstance updated = orchestratorService.retryCurrentPhase(id, reason, actor);
         return ResponseEntity.ok(WorkflowSummaryResponse.from(updated));
     }
 
@@ -134,11 +161,30 @@ public class WorkflowController {
                     .filter(java.nio.file.Files::isRegularFile)
                     .map(p -> {
                         String rel = finalBase.relativize(p).toString().replace("\\", "/");
-                        return Map.of(
-                                "name", p.getFileName().toString(),
+                        String name = p.getFileName().toString();
+                        String lower = rel.toLowerCase();
+                        String type = "OTHER";
+                        if (lower.endsWith(".md")) type = "MARKDOWN";
+                        else if (lower.endsWith(".json")) type = "JSON";
+                        else if (lower.endsWith(".sql")) type = "SQL";
+                        else if (lower.endsWith(".java")) type = "JAVA";
+                        else if (lower.endsWith(".ts") || lower.endsWith(".tsx")) type = "TYPESCRIPT";
+                        else if (lower.endsWith(".yml") || lower.endsWith(".yaml")) type = "YAML";
+                        else if (lower.endsWith(".xml")) type = "XML";
+                        else if (lower.endsWith("dockerfile") || lower.equals("dockerfile")) type = "DOCKERFILE";
+
+                        long size = 0;
+                        try {
+                            size = java.nio.file.Files.size(p);
+                        } catch (java.io.IOException ignored) {}
+
+                        Map<String, String> item = Map.of(
+                                "name", name,
                                 "path", rel,
-                                "type", rel.endsWith(".md") ? "MARKDOWN" : (rel.endsWith(".json") ? "JSON" : (rel.endsWith(".sql") ? "SQL" : (rel.endsWith(".java") ? "JAVA" : "OTHER")))
+                                "type", type,
+                                "sizeBytes", String.valueOf(size)
                         );
+                        return item;
                     })
                     .toList();
             return ResponseEntity.ok(artifacts);

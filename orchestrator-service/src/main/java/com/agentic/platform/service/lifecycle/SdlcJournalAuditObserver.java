@@ -37,20 +37,24 @@ public class SdlcJournalAuditObserver implements PhaseLifecycleObserver {
             Path filePath = base.resolve("SDLC_LOG.md");
 
             String artifactsList = result.getProducedArtifacts().isEmpty()
-                    ? "Tercatat di audit ledger internal"
+                    ? "Recorded in internal audit ledger"
                     : result.getProducedArtifacts().stream().map(a -> "`" + a + "`").collect(Collectors.joining(", "));
+
+            String revisionSection = context.hasRevisionFeedback()
+                    ? String.format("- **Supervisor Revision Directive Applied:** \"%s\"\n", context.getRevisionFeedback())
+                    : "";
 
             String entry = String.format("""
 
 ### [%s] %s
-- **Agent Pelaksana:** %s
-- **Skill Terpasang:** `%s`
-- **Pola / Teknik:** %s
-- **Alasan / Rationale (Why):** %s
-- **Artefak yang Dihasilkan:** %s
-- **Durasi Eksekusi:** %d ms
-- **Prompt & Inference Log:** Tercatat lengkap di [PROMPTS_AND_INFERENCES.md](./PROMPTS_AND_INFERENCES.md)
-- **Waktu:** %s
+- **Executing Agent:** %s
+- **Mounted Skills:** `%s` (Loaded dynamically from `.agents/skills`)
+- **Pattern / Technique:** %s
+%s- **Rationale (Why):** %s
+- **Produced Artifacts:** %s
+- **Execution Duration:** %d ms
+- **Prompt & Inference Log:** Recorded in detail in [inferences/](./inferences/)
+- **Timestamp:** %s
 
 ---
 """,
@@ -59,6 +63,7 @@ public class SdlcJournalAuditObserver implements PhaseLifecycleObserver {
                     context.getAgentRole(),
                     context.getInstalledSkills(),
                     context.getPatternsAndTechniques(),
+                    revisionSection,
                     result.getRationale(),
                     artifactsList,
                     result.getDurationMs(),
@@ -67,7 +72,7 @@ public class SdlcJournalAuditObserver implements PhaseLifecycleObserver {
 
             if (!Files.exists(filePath)) {
                 String header = "# SDLC Activity & Decision Journal\n**Project ID:** " + context.getProjectId() +
-                        "\nLaporan menyeluruh aktivitas agen, teknik yang diterapkan, dan rationale (Why).\n---\n";
+                        "\nComprehensive record of agent activities, patterns applied, and rationale (Why).\n---\n";
                 Files.writeString(filePath, header + entry);
             } else {
                 Files.writeString(filePath, entry, StandardOpenOption.APPEND);
@@ -90,10 +95,10 @@ public class SdlcJournalAuditObserver implements PhaseLifecycleObserver {
             String entry = String.format("""
 
 ### [%s] %s (FAILED)
-- **Agent Pelaksana:** %s
+- **Executing Agent:** %s
 - **Status:** FAILED / ERROR
-- **Penyebab Error:** %s
-- **Waktu:** %s
+- **Error Details:** %s
+- **Timestamp:** %s
 
 ---
 """,

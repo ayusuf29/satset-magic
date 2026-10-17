@@ -108,14 +108,27 @@ export async function approveWorkflow(id: string, comment: string, actor = "HUMA
   return await res.json();
 }
 
-export async function rejectWorkflow(id: string, comment: string, actor = "HUMAN_OPERATOR"): Promise<WorkflowSummary> {
-  const res = await fetch(`${API_BASE}/api/workflow/${id}/reject`, {
+export async function returnWorkflow(
+  id: string,
+  comment: string,
+  targetPhase?: string,
+  actor = "HUMAN_OPERATOR"
+): Promise<WorkflowSummary> {
+  const res = await fetch(`${API_BASE}/api/workflow/${id}/return`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ comment, actor }),
+    body: JSON.stringify({ comment, actor, targetPhase: targetPhase || undefined }),
   });
-  if (!res.ok) throw new Error("Gagal memproses penolakan");
+  if (!res.ok) throw new Error("Gagal mengembalikan alur kerja untuk revisi");
   return await res.json();
+}
+
+export async function rejectWorkflow(
+  id: string,
+  comment: string,
+  actor = "HUMAN_OPERATOR"
+): Promise<WorkflowSummary> {
+  return returnWorkflow(id, comment, undefined, actor);
 }
 
 export async function advanceWorkflow(id: string, comment = "Manual advance"): Promise<WorkflowSummary> {
@@ -123,6 +136,43 @@ export async function advanceWorkflow(id: string, comment = "Manual advance"): P
     method: "POST",
   });
   if (!res.ok) throw new Error("Gagal memajukan fase");
+  return await res.json();
+}
+
+export async function revertWorkflowPhase(
+  id: string,
+  targetPhase: string,
+  reason = "Reverted by operator",
+  actor = "HUMAN_OPERATOR"
+): Promise<WorkflowSummary> {
+  const res = await fetch(
+    `${API_BASE}/api/workflow/${id}/revert-phase?targetPhase=${encodeURIComponent(targetPhase)}&reason=${encodeURIComponent(reason)}&actor=${encodeURIComponent(actor)}`,
+    {
+      method: "POST",
+    }
+  );
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.message || "Gagal mengembalikan fase workflow");
+  }
+  return await res.json();
+}
+
+export async function retryWorkflowPhase(
+  id: string,
+  reason = "Execution retried by operator",
+  actor = "HUMAN_OPERATOR"
+): Promise<WorkflowSummary> {
+  const res = await fetch(
+    `${API_BASE}/api/workflow/${id}/retry?reason=${encodeURIComponent(reason)}&actor=${encodeURIComponent(actor)}`,
+    {
+      method: "POST",
+    }
+  );
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.message || "Gagal menjalankan ulang fase workflow");
+  }
   return await res.json();
 }
 
@@ -148,7 +198,8 @@ export async function submitCouncilReview(
 export interface ArtifactMeta {
   name: string;
   path: string;
-  type: "MARKDOWN" | "JSON" | "OTHER";
+  type: string;
+  sizeBytes?: string;
 }
 
 export async function fetchArtifacts(workflowId: string): Promise<ArtifactMeta[]> {

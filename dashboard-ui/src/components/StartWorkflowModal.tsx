@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { X, Sparkles, Loader2, Play } from "lucide-react";
 import { startWorkflow } from "@/lib/api";
 import { useLanguage } from "@/lib/i18n";
@@ -18,6 +19,21 @@ export function StartWorkflowModal({ isOpen, onClose, onCreated }: StartWorkflow
   const [projectId, setProjectId] = useState("");
   const [clientId, setClientId] = useState("");
   const [loading, setLoading] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (isOpen) {
+      const prev = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+      return () => {
+        document.body.style.overflow = prev;
+      };
+    }
+  }, [isOpen]);
 
   const presets = useMemo(() => [
     {
@@ -67,9 +83,19 @@ export function StartWorkflowModal({ isOpen, onClose, onCreated }: StartWorkflow
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="w-full max-w-lg rounded-2xl glass-panel p-5 sm:p-6 border border-slate-700 shadow-2xl relative max-h-[90vh] overflow-y-auto">
+  if (!isOpen || !mounted) return null;
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div
+        className="w-full max-w-lg rounded-2xl glass-panel p-5 sm:p-6 border border-slate-700 shadow-2xl relative max-h-[90vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
         <button
           onClick={onClose}
           className="touch-target absolute top-4 right-4 p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition"
@@ -171,6 +197,7 @@ export function StartWorkflowModal({ isOpen, onClose, onCreated }: StartWorkflow
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

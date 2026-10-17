@@ -15,6 +15,7 @@ import { ProjectArtifactsExplorer } from "@/components/ProjectArtifactsExplorer"
 import { TeamTopologyArtifactsExplorer } from "@/components/TeamTopologyArtifactsExplorer";
 import { DashboardSummaryKPIs, ProjectFilterStatus } from "@/components/DashboardSummaryKPIs";
 import { ProjectWorkflowTable } from "@/components/ProjectWorkflowTable";
+import { HitlAuditTrailCard } from "@/components/HitlAuditTrailCard";
 import { useLanguage } from "@/lib/i18n";
 import {
   Play,
@@ -180,6 +181,12 @@ export default function DashboardPage() {
                   workflow={selectedWorkflow}
                   onReviewSubmitted={loadData}
                 />
+
+                {/* Human-in-the-Loop (HITL) Action History & Audit Trail */}
+                <HitlAuditTrailCard
+                  workflow={selectedWorkflow}
+                  onRefresh={loadData}
+                />
               </section>
             )}
 
@@ -241,6 +248,12 @@ export default function DashboardPage() {
 
             {/* Artifacts & SDLC Log Explorer in Pipeline Tab */}
             <TeamTopologyArtifactsExplorer workflow={selectedWorkflow} />
+
+            {/* Human-in-the-Loop (HITL) Action History & Audit Trail */}
+            <HitlAuditTrailCard
+              workflow={selectedWorkflow}
+              onRefresh={loadData}
+            />
           </div>
         )}
 

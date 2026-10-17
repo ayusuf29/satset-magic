@@ -50,6 +50,9 @@ public class WorkflowInstance {
     @Column(length = 64)
     private String lastDecision;
 
+    @Column(columnDefinition = "TEXT")
+    private String revisionFeedback;
+
     @Column(nullable = false)
     private boolean agentRunning = false;
 
@@ -136,6 +139,8 @@ public class WorkflowInstance {
     public void setPayloadJson(String payloadJson) { this.payloadJson = payloadJson; }
     public String getLastDecision() { return lastDecision; }
     public void setLastDecision(String lastDecision) { this.lastDecision = lastDecision; }
+    public String getRevisionFeedback() { return revisionFeedback; }
+    public void setRevisionFeedback(String revisionFeedback) { this.revisionFeedback = revisionFeedback; }
     public boolean isAgentRunning() { return agentRunning; }
     public void setAgentRunning(boolean agentRunning) { this.agentRunning = agentRunning; }
     public String getCurrentAgentRole() { return currentAgentRole; }
@@ -167,6 +172,7 @@ public class WorkflowInstance {
         private boolean performanceApproved = false;
         private String payloadJson;
         private String lastDecision;
+        private String revisionFeedback;
         private boolean agentRunning = false;
         private String currentAgentRole;
         private String currentAgentActivity;
@@ -187,6 +193,7 @@ public class WorkflowInstance {
         public Builder performanceApproved(boolean performanceApproved) { this.performanceApproved = performanceApproved; return this; }
         public Builder payloadJson(String payloadJson) { this.payloadJson = payloadJson; return this; }
         public Builder lastDecision(String lastDecision) { this.lastDecision = lastDecision; return this; }
+        public Builder revisionFeedback(String revisionFeedback) { this.revisionFeedback = revisionFeedback; return this; }
         public Builder agentRunning(boolean agentRunning) { this.agentRunning = agentRunning; return this; }
         public Builder currentAgentRole(String currentAgentRole) { this.currentAgentRole = currentAgentRole; return this; }
         public Builder currentAgentActivity(String currentAgentActivity) { this.currentAgentActivity = currentAgentActivity; return this; }
@@ -205,6 +212,7 @@ public class WorkflowInstance {
                     createdAt != null ? createdAt : now,
                     updatedAt != null ? updatedAt : now
             );
+            instance.setRevisionFeedback(revisionFeedback);
             instance.setAgentRunning(agentRunning);
             instance.setCurrentAgentRole(currentAgentRole);
             instance.setCurrentAgentActivity(currentAgentActivity);
