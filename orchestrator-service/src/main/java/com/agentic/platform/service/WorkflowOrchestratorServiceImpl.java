@@ -99,24 +99,25 @@ public class WorkflowOrchestratorServiceImpl implements WorkflowOrchestratorServ
                 .payloadJson(initialPayload)
                 .build();
 
-        WorkflowInstance saved = workflowRepository.saveAndFlush(instance);
+        WorkflowInstance saved = workflowRepository.save(instance);
+        WorkflowInstance target = saved != null ? saved : instance;
 
         // Auto-provision isolated workspace directory for this project
         journalService.provisionProjectWorkspace(finalProjectId, taskName, description);
 
-        recordTransition(saved, null, WorkflowState.PHASE_0_REQUIREMENT_DISCOVERY, "SYSTEM",
+        recordTransition(target, null, WorkflowState.PHASE_0_REQUIREMENT_DISCOVERY, "SYSTEM",
                 "Workflow initialized for Project: " + finalProjectId);
 
         eventPublisher.publishEvent(AgentEvent.of(
-                saved.getId(),
-                saved.getCurrentState(),
+                target.getId(),
+                target.getCurrentState(),
                 "WORKFLOW_CREATED",
                 String.format("[%s][%s] Workflow initiated: %s", finalClientId, finalProjectId, taskName)));
 
         // Trigger Phase 0 autonomously
-        dispatchAutonomousExecution(WorkflowState.PHASE_0_REQUIREMENT_DISCOVERY, saved.getId());
+        dispatchAutonomousExecution(WorkflowState.PHASE_0_REQUIREMENT_DISCOVERY, target.getId());
 
-        return saved;
+        return target;
     }
 
     @Override
@@ -242,7 +243,7 @@ public class WorkflowOrchestratorServiceImpl implements WorkflowOrchestratorServ
         WorkflowInstance workflow = getWorkflowById(workflowId);
         WorkflowState currentState = workflow.getCurrentState();
 
-        if (workflow.isAgentRunning() && !currentState.isHumanGate()) {
+        if (workflow.isAgentRunning()) {
             throw new InvalidWorkflowTransitionException(
                     currentState,
                     currentState,
@@ -255,7 +256,8 @@ public class WorkflowOrchestratorServiceImpl implements WorkflowOrchestratorServ
         }
 
         boolean isApprove = "APPROVE".equalsIgnoreCase(decision) || "SETUJUI".equalsIgnoreCase(decision);
-        workflow.setLastDecision(isApprove ? "APPROVED" : "RETURNED");
+        boolean isReject = "REJECT".equalsIgnoreCase(decision) || "TOLAK".equalsIgnoreCase(decision);
+        workflow.setLastDecision(isApprove ? "APPROVED" : (isReject ? "REJECTED" : "RETURNED"));
         if (isApprove) {
             workflow.setRevisionFeedback(null);
         } else {
@@ -518,19 +520,23 @@ public class WorkflowOrchestratorServiceImpl implements WorkflowOrchestratorServ
         WorkflowState fromState = workflow.getCurrentState();
         workflow.setCurrentState(targetState);
         WorkflowInstance saved = workflowRepository.saveAndFlush(workflow);
+        WorkflowInstance target = saved != null ? saved : workflow;
 
-        recordTransition(saved, fromState, targetState, actor, comment);
+        recordTransition(target, fromState, targetState, actor, comment);
 
         eventPublisher.publishEvent(AgentEvent.of(
-                saved.getId(),
+                target.getId(),
                 targetState,
                 "STATE_TRANSITION",
                 String.format("[%s] %s -> %s: %s", actor, fromState, targetState, comment)));
 
-        return saved;
+        return target;
     }
 
     private void recordTransition(WorkflowInstance workflow, WorkflowState fromState, WorkflowState toState, String actor, String comment) {
+        if (workflow == null || workflow.getId() == null) {
+            return;
+        }
         WorkflowTransitionLog logEntry = WorkflowTransitionLog.builder()
                 .workflowId(workflow.getId())
                 .fromState(fromState)

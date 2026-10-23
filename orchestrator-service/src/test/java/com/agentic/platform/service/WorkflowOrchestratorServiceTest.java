@@ -90,12 +90,11 @@ class WorkflowOrchestratorServiceTest {
                 .taskName("Test Task")
                 .currentState(WorkflowState.PHASE_1_ARCHITECTURE_AND_DESIGN)
                 .build();
-
         when(workflowRepository.findById("wf-test-01")).thenReturn(Optional.of(workflow));
 
         WorkflowInstance updated = orchestratorService.advanceWorkflow("wf-test-01", "ARCHITECT", "C4 diagram approved");
 
-        assertEquals(WorkflowState.PHASE_2_BACKLOG_GENERATION, updated.getCurrentState());
+        assertEquals(WorkflowState.PHASE_1_WAITING_HUMAN_APPROVAL, updated.getCurrentState());
         verify(eventPublisher, atLeastOnce()).publishEvent(any());
     }
 

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { Terminal, Copy, Check, Trash2, ArrowDownCircle, Wifi, WifiOff, FolderGit2, Loader2, Sparkles, ShieldAlert, CheckCircle2 } from "lucide-react";
-import { fetchWorkflowDetail } from "@/lib/api";
+import { fetchWorkflowDetail, getApiBaseUrl } from "@/lib/api";
 import { WorkflowSummary } from "@/lib/types";
 import { useLanguage } from "@/lib/i18n";
 
@@ -42,30 +42,43 @@ export function TerminalLogStreamer({
   const [connected, setConnected] = useState<boolean>(false);
   const logContainerRef = useRef<HTMLDivElement>(null);
 
-  // 1. Reset logs saat berpindah proyek agar tidak campur aduk
+  const activeWorkflowIdRef = useRef<string | undefined>(undefined);
+  const currentWfRef = useRef(currentWf);
   useEffect(() => {
-    const projLabel = currentWf ? `${currentWf.projectId} (${currentWf.taskName})` : workflowId || "Global Stream";
-    setLogs([
-      {
-        id: `switch-${workflowId || "global"}-${Date.now()}`,
-        time: new Date().toLocaleTimeString(),
-        type: "INFO",
-        message: t.telemetry.channelSwitched(projLabel),
-      },
-    ]);
-  }, [workflowId, currentWf, t]);
+    currentWfRef.current = currentWf;
+  }, [currentWf]);
 
-  // 2. Sinkronisasi Riwayat Nyata dari Database (History Polling / Initial Load)
+  // 1. Sinkronisasi Riwayat Nyata & Switch Proyek (Hanya reset saat workflowId benar-benar berganti)
   useEffect(() => {
-    if (!workflowId) return;
-
     let isMounted = true;
-    const loadHistory = async () => {
+    const isNewProject = activeWorkflowIdRef.current !== workflowId;
+    activeWorkflowIdRef.current = workflowId;
+
+    const targetWf = currentWfRef.current;
+    const projLabel = targetWf
+      ? `${targetWf.projectId || targetWf.id} (${targetWf.taskName})`
+      : workflowId || "Global Stream";
+
+    const makeSwitchNotice = (): LogEntry => ({
+      id: `switch-${workflowId || "global"}-${Date.now()}`,
+      time: new Date().toLocaleTimeString(),
+      type: "INFO",
+      message: t.telemetry.channelSwitched(projLabel),
+    });
+
+    const syncHistory = async (isInitial: boolean) => {
+      if (!workflowId) {
+        if (isInitial && isMounted) {
+          setLogs([makeSwitchNotice()]);
+        }
+        return;
+      }
+
       try {
         const detail = await fetchWorkflowDetail(workflowId);
-        if (!isMounted || !detail.history) return;
+        if (!isMounted) return;
 
-        const loadedLogs: LogEntry[] = detail.history.map((h) => ({
+        const loadedLogs: LogEntry[] = (detail.history || []).map((h) => ({
           id: `hist-${h.id}`,
           time: new Date(h.createdAt).toLocaleTimeString(),
           type: (h.actor === "HUMAN_OPERATOR"
@@ -76,28 +89,42 @@ export function TerminalLogStreamer({
           message: `[${h.toState}] [${h.actor}] ${h.message}`,
         }));
 
-        setLogs((prev) => {
-          const existingIds = new Set(prev.map((p) => p.id));
-          const newItems = loadedLogs.filter((l) => !existingIds.has(l.id));
-          if (newItems.length === 0) return prev;
-          return [...prev, ...newItems];
-        });
+        if (isInitial) {
+          // Saat perpindahan / inisialisasi: muat riwayat historis dalam urutan kronologis + switch notice
+          setLogs([...loadedLogs, makeSwitchNotice()]);
+        } else {
+          // Polling background berkala: HANYA tambahkan entri baru yang belum tercatat
+          setLogs((prev) => {
+            const existingIds = new Set(prev.map((p) => p.id));
+            const newItems = loadedLogs.filter((l) => !existingIds.has(l.id));
+            if (newItems.length === 0) return prev;
+            return [...prev, ...newItems];
+          });
+        }
       } catch {
-        // Silent catch for background polling
+        if (isInitial && isMounted) {
+          setLogs([makeSwitchNotice()]);
+        }
       }
     };
 
-    loadHistory();
-    const interval = setInterval(loadHistory, 3000); // Polling sync setiap 3 detik
+    // Jalankan sync saat workflowId berubah
+    syncHistory(isNewProject);
+
+    // Polling background setiap 4 detik untuk update riwayat tanpa me-reset log
+    const interval = setInterval(() => {
+      syncHistory(false);
+    }, 4000);
+
     return () => {
       isMounted = false;
       clearInterval(interval);
     };
-  }, [workflowId]);
+  }, [workflowId, t]);
 
-  // 3. Realtime SSE Event Stream
+  // 2. Realtime SSE Event Stream
   useEffect(() => {
-    const apiBase = process.env.NEXT_PUBLIC_ORCHESTRATOR_API_URL || "http://127.0.0.1:8080";
+    const apiBase = getApiBaseUrl();
     const streamUrl = workflowId
       ? `${apiBase}/api/workflow/${workflowId}/stream`
       : `${apiBase}/api/workflow/stream`;
@@ -124,7 +151,10 @@ export function TerminalLogStreamer({
             type: data.type || "INFO",
             message: `[${data.state || "PIPELINE"}] ${data.message || ""}`,
           };
-          setLogs((prev) => [...prev, newEntry]);
+          setLogs((prev) => {
+            if (prev.some((p) => p.id === newEntry.id)) return prev;
+            return [...prev, newEntry];
+          });
         } catch {
           setLogs((prev) => [
             ...prev,
@@ -226,8 +256,8 @@ export function TerminalLogStreamer({
               <Wifi className="h-3 w-3" /> {t.telemetry.connected}
             </span>
           ) : (
-            <span className="inline-flex items-center gap-1 text-[10px] text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded-full border border-cyan-500/20 font-mono">
-              <span className="h-1.5 w-1.5 rounded-full bg-cyan-400 animate-ping inline-block" /> {t.telemetry.connected} (Active)
+            <span className="inline-flex items-center gap-1 text-[10px] text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20 font-mono">
+              <WifiOff className="h-3 w-3" /> {t.telemetry.disconnected}
             </span>
           )}
         </div>

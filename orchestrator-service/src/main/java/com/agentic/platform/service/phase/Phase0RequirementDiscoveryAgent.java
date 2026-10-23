@@ -165,6 +165,14 @@ public class Phase0RequirementDiscoveryAgent implements PhaseAgentHandler {
                 content = buildFallbackGherkin(projectId, taskName, description);
             }
 
+            if (content == null || content.isBlank() || content.lines().count() < 12
+                    || !content.contains("Given") || !content.contains("When") || !content.contains("Then")
+                    || content.contains("[MOCK_OUTPUT]")) {
+                log.warn("LLM Spec generation produced insufficient or truncated content, falling back to rich domain template.");
+                content = buildFallbackGherkin(projectId, taskName, description);
+                isFallback = true;
+            }
+
             String auditTrace = String.format("""
 
                     ---
@@ -261,6 +269,12 @@ public class Phase0RequirementDiscoveryAgent implements PhaseAgentHandler {
                 isFallback = true;
                 log.warn("LLM Threat model fallback triggered for project {}: {}", projectId, ex.getMessage());
                 content = buildFallbackThreatModel(projectId, taskName, description);
+            }
+
+            if (content == null || content.isBlank() || content.lines().count() < 5 || content.contains("[MOCK_OUTPUT]")) {
+                log.warn("LLM Threat model produced insufficient content or mock output, falling back to rich domain template.");
+                content = buildFallbackThreatModel(projectId, taskName, description);
+                isFallback = true;
             }
 
             String auditTrace = String.format("""

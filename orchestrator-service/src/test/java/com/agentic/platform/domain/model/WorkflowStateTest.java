@@ -29,22 +29,34 @@ class WorkflowStateTest {
                 WorkflowState.PHASE_0_REQUIREMENT_DISCOVERY.getNextDefaultState());
         assertEquals(WorkflowState.PHASE_1_ARCHITECTURE_AND_DESIGN,
                 WorkflowState.PHASE_0_WAITING_HUMAN_SIGN_OFF.getNextDefaultState());
-        assertEquals(WorkflowState.PHASE_2_BACKLOG_GENERATION,
+        assertEquals(WorkflowState.PHASE_1_WAITING_HUMAN_APPROVAL,
                 WorkflowState.PHASE_1_ARCHITECTURE_AND_DESIGN.getNextDefaultState());
-        assertEquals(WorkflowState.PHASE_3_TASK_DISPATCHING,
+        assertEquals(WorkflowState.PHASE_2_BACKLOG_GENERATION,
+                WorkflowState.PHASE_1_WAITING_HUMAN_APPROVAL.getNextDefaultState());
+        assertEquals(WorkflowState.PHASE_2_WAITING_HUMAN_APPROVAL,
                 WorkflowState.PHASE_2_BACKLOG_GENERATION.getNextDefaultState());
-        assertEquals(WorkflowState.PHASE_4_TDD_PLANNING,
+        assertEquals(WorkflowState.PHASE_3_TASK_DISPATCHING,
+                WorkflowState.PHASE_2_WAITING_HUMAN_APPROVAL.getNextDefaultState());
+        assertEquals(WorkflowState.PHASE_3_WAITING_HUMAN_APPROVAL,
                 WorkflowState.PHASE_3_TASK_DISPATCHING.getNextDefaultState());
-        assertEquals(WorkflowState.PHASE_5_DEVELOPMENT_IMPLEMENTATION,
+        assertEquals(WorkflowState.PHASE_4_TDD_PLANNING,
+                WorkflowState.PHASE_3_WAITING_HUMAN_APPROVAL.getNextDefaultState());
+        assertEquals(WorkflowState.PHASE_4_WAITING_HUMAN_APPROVAL,
                 WorkflowState.PHASE_4_TDD_PLANNING.getNextDefaultState());
-        assertEquals(WorkflowState.PHASE_6_CODE_REVIEW,
+        assertEquals(WorkflowState.PHASE_5_DEVELOPMENT_IMPLEMENTATION,
+                WorkflowState.PHASE_4_WAITING_HUMAN_APPROVAL.getNextDefaultState());
+        assertEquals(WorkflowState.PHASE_5_WAITING_HUMAN_APPROVAL,
                 WorkflowState.PHASE_5_DEVELOPMENT_IMPLEMENTATION.getNextDefaultState());
+        assertEquals(WorkflowState.PHASE_6_CODE_REVIEW,
+                WorkflowState.PHASE_5_WAITING_HUMAN_APPROVAL.getNextDefaultState());
         assertEquals(WorkflowState.PHASE_6_WAITING_HUMAN_CODE_REVIEW_AND_MERGE,
                 WorkflowState.PHASE_6_CODE_REVIEW.getNextDefaultState());
         assertEquals(WorkflowState.PHASE_7_QA_VERIFICATION,
                 WorkflowState.PHASE_6_WAITING_HUMAN_CODE_REVIEW_AND_MERGE.getNextDefaultState());
-        assertEquals(WorkflowState.PHASE_8_READY_FOR_PRODUCTION_GATE,
+        assertEquals(WorkflowState.PHASE_7_WAITING_HUMAN_APPROVAL,
                 WorkflowState.PHASE_7_QA_VERIFICATION.getNextDefaultState());
+        assertEquals(WorkflowState.PHASE_8_READY_FOR_PRODUCTION_GATE,
+                WorkflowState.PHASE_7_WAITING_HUMAN_APPROVAL.getNextDefaultState());
         assertEquals(WorkflowState.PHASE_9_RELEASED,
                 WorkflowState.PHASE_8_READY_FOR_PRODUCTION_GATE.getNextDefaultState());
     }

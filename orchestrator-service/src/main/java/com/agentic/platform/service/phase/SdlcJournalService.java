@@ -79,13 +79,13 @@ public class SdlcJournalService {
             return "";
         }
         String trimmed = raw.trim();
-        if (trimmed.startsWith("```markdown")) {
-            trimmed = trimmed.substring(11).trim();
-            if (trimmed.endsWith("```")) {
-                trimmed = trimmed.substring(0, trimmed.length() - 3).trim();
+        if (trimmed.startsWith("```")) {
+            int firstNewline = trimmed.indexOf('\n');
+            if (firstNewline != -1 && firstNewline <= 30) {
+                trimmed = trimmed.substring(firstNewline + 1).trim();
+            } else {
+                trimmed = trimmed.substring(3).trim();
             }
-        } else if (trimmed.startsWith("```")) {
-            trimmed = trimmed.substring(3).trim();
             if (trimmed.endsWith("```")) {
                 trimmed = trimmed.substring(0, trimmed.length() - 3).trim();
             }
@@ -106,8 +106,14 @@ public class SdlcJournalService {
                     (roleLower.contains("appsec") || summaryLower.contains("threat"))
                             ? "phase0-appsec-threat-model.md"
                             : "phase0-spec-writer.md";
-            case "PHASE_1_ARCHITECTURE_AND_DESIGN" -> "phase1-system-architect.md";
-            case "PHASE_2_BACKLOG_GENERATION" -> "phase2-backlog-spec.md";
+            case "PHASE_1_ARCHITECTURE_AND_DESIGN" ->
+                    (roleLower.contains("council") || summaryLower.contains("audit"))
+                            ? "phase1-architecture-audit.md"
+                            : "phase1-system-architect.md";
+            case "PHASE_2_BACKLOG_GENERATION" ->
+                    (roleLower.contains("database") || summaryLower.contains("schema") || summaryLower.contains("ddl"))
+                            ? "phase2-database-architect.md"
+                            : "phase2-backlog-spec.md";
             case "PHASE_3_TASK_DISPATCHING" -> "phase3-task-dispatcher.md";
             case "PHASE_4_TDD_PLANNING" -> "phase4-tdd-orchestrator.md";
             case "PHASE_5_DEVELOPMENT_IMPLEMENTATION" -> "phase5-dev-engineer.md";

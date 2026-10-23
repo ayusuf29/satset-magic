@@ -187,6 +187,12 @@ public class Phase7QaVerificationAgent implements PhaseAgentHandler {
                 content = buildFallbackQaReport(projectId, taskName, description);
             }
 
+            if (isInvalidQaReportOutput(content)) {
+                log.warn("LLM Phase 7 QA report produced insufficient, truncated, or invalid content. Activating rich domain SSOT fallback.");
+                content = buildFallbackQaReport(projectId, taskName, description);
+                isFallback = true;
+            }
+
             String auditTrace = String.format("""
 
                     ---
@@ -242,5 +248,39 @@ public class Phase7QaVerificationAgent implements PhaseAgentHandler {
                 ## 4. QA Gate Verdict
                 System successfully verified in staging sandbox and authorized for Phase 8 Production Gate.
                 """, projectId, taskName, taskName);
+    }
+
+    public boolean isInvalidQaReportOutput(String content) {
+        if (content == null || content.isBlank()) return true;
+        if (content.contains("[MOCK_OUTPUT]")) return true;
+
+        long lineCount = content.lines().count();
+        if (lineCount < 20) return true;
+
+        int fenceCount = countOccurrences(content, "```");
+        if (fenceCount % 2 != 0) return true;
+
+        if (!content.contains("# QA Sandbox Verification") ||
+            !content.contains("QA Gate Verdict")) {
+            return true;
+        }
+
+        String trimmed = content.trim();
+        if (trimmed.endsWith(",") || trimmed.endsWith("(") || trimmed.endsWith("|") ||
+            trimmed.endsWith("AND") || trimmed.endsWith("OR") || trimmed.endsWith("WHERE")) {
+            return true;
+        }
+
+        return false;
+    }
+
+    private int countOccurrences(String text, String sub) {
+        int count = 0;
+        int idx = 0;
+        while ((idx = text.indexOf(sub, idx)) != -1) {
+            count++;
+            idx += sub.length();
+        }
+        return count;
     }
 }

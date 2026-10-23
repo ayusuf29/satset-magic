@@ -1,6 +1,38 @@
 import { WorkflowSummary, WorkflowDetail } from "./types";
 
-const API_BASE = process.env.NEXT_PUBLIC_ORCHESTRATOR_API_URL || "http://127.0.0.1:8080";
+export function getApiBaseUrl(): string {
+  if (typeof window !== "undefined") {
+    const envApi = process.env.NEXT_PUBLIC_ORCHESTRATOR_API_URL;
+    if (envApi && !envApi.includes("127.0.0.1") && !envApi.includes("localhost")) {
+      return envApi;
+    }
+    // Auto-detect when accessed on GCP / remote IP (e.g. http://34.128.x.x:3000 -> http://34.128.x.x:8080)
+    if (window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1") {
+      const protocol = window.location.protocol === "https:" ? "https:" : "http:";
+      return `${protocol}//${window.location.hostname}:8080`;
+    }
+  }
+  return process.env.NEXT_PUBLIC_ORCHESTRATOR_API_URL || "http://127.0.0.1:8080";
+}
+
+export function getWsBaseUrl(): string {
+  if (typeof window !== "undefined") {
+    const envWs = process.env.NEXT_PUBLIC_WS_URL;
+    if (envWs && !envWs.includes("127.0.0.1") && !envWs.includes("localhost")) {
+      return envWs;
+    }
+    // Auto-detect WebSocket when accessed on GCP / remote IP
+    if (window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1") {
+      const wsProto = window.location.protocol === "https:" ? "wss:" : "ws:";
+      return `${wsProto}//${window.location.hostname}:8080/ws/agent-events`;
+    }
+  }
+  return process.env.NEXT_PUBLIC_WS_URL || "ws://127.0.0.1:8080/ws/agent-events";
+}
+
+const API_BASE = {
+  toString: () => getApiBaseUrl(),
+};
 
 export async function fetchWorkflows(): Promise<WorkflowSummary[]> {
   try {
@@ -229,6 +261,58 @@ export async function deleteWorkflow(id: string): Promise<void> {
     method: "DELETE",
   });
   if (!res.ok) throw new Error("Gagal menghapus proyek / workflow");
+}
+
+export interface ProjectRuntimeStatus {
+  projectId: string;
+  status: "STOPPED" | "STARTING" | "RUNNING" | "STOPPING" | "ERROR";
+  frontendUrl: string;
+  backendUrl: string;
+  frontendPort: number;
+  backendPort: number;
+  postgresPort: number;
+  redisPort: number;
+  kafkaPort: number;
+  message: string;
+  lastUpdated: string;
+}
+
+export async function fetchProjectRuntimeStatus(projectId: string): Promise<ProjectRuntimeStatus> {
+  try {
+    const res = await fetch(`${API_BASE}/api/v1/projects/${projectId}/runtime/status`, { cache: "no-store" });
+    if (!res.ok) throw new Error("Gagal mengambil status runtime proyek");
+    return await res.json();
+  } catch (err) {
+    return {
+      projectId,
+      status: "STOPPED",
+      frontendUrl: "http://localhost:3200",
+      backendUrl: "http://localhost:8180",
+      frontendPort: 3200,
+      backendPort: 8180,
+      postgresPort: 5433,
+      redisPort: 6380,
+      kafkaPort: 9092,
+      message: "Runtime offline (fallback)",
+      lastUpdated: new Date().toISOString(),
+    };
+  }
+}
+
+export async function startProjectRuntime(projectId: string): Promise<ProjectRuntimeStatus> {
+  const res = await fetch(`${API_BASE}/api/v1/projects/${projectId}/runtime/start`, {
+    method: "POST",
+  });
+  if (!res.ok) throw new Error("Gagal menjalankan container stack proyek");
+  return await res.json();
+}
+
+export async function stopProjectRuntime(projectId: string): Promise<ProjectRuntimeStatus> {
+  const res = await fetch(`${API_BASE}/api/v1/projects/${projectId}/runtime/stop`, {
+    method: "POST",
+  });
+  if (!res.ok) throw new Error("Gagal menghentikan container stack proyek");
+  return await res.json();
 }
 
 

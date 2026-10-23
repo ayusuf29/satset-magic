@@ -189,6 +189,12 @@ public class Phase6CodeReviewAgent implements PhaseAgentHandler {
                 content = buildFallbackCouncilAudit(projectId, taskName, description);
             }
 
+            if (isInvalidCouncilAuditOutput(content)) {
+                log.warn("LLM Phase 6 council review produced insufficient, truncated, or invalid content. Activating rich domain SSOT fallback.");
+                content = buildFallbackCouncilAudit(projectId, taskName, description);
+                isFallback = true;
+            }
+
             String auditTrace = String.format("""
 
                     ---
@@ -303,5 +309,40 @@ public class Phase6CodeReviewAgent implements PhaseAgentHandler {
 
                 **Recommendation:** Authorized for Human Merge Sign-off.
                 """, projectId, taskName, taskName);
+    }
+
+    public boolean isInvalidCouncilAuditOutput(String content) {
+        if (content == null || content.isBlank()) return true;
+        if (content.contains("[MOCK_OUTPUT]")) return true;
+
+        long lineCount = content.lines().count();
+        if (lineCount < 25) return true;
+
+        int fenceCount = countOccurrences(content, "```");
+        if (fenceCount % 2 != 0) return true;
+
+        if (!content.contains("# Triad Council Code Review Audit") ||
+            !content.contains("## Executive Summary") ||
+            !content.contains("Council Consensus")) {
+            return true;
+        }
+
+        String trimmed = content.trim();
+        if (trimmed.endsWith(",") || trimmed.endsWith("(") || trimmed.endsWith("|") ||
+            trimmed.endsWith("AND") || trimmed.endsWith("OR") || trimmed.endsWith("WHERE")) {
+            return true;
+        }
+
+        return false;
+    }
+
+    private int countOccurrences(String text, String sub) {
+        int count = 0;
+        int idx = 0;
+        while ((idx = text.indexOf(sub, idx)) != -1) {
+            count++;
+            idx += sub.length();
+        }
+        return count;
     }
 }

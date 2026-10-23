@@ -1,8 +1,10 @@
 package com.agentic.platform.config;
 
 import dev.langchain4j.data.message.AiMessage;
+import dev.langchain4j.data.message.ChatMessage;
 import dev.langchain4j.model.chat.ChatLanguageModel;
 import dev.langchain4j.model.googleai.GoogleAiGeminiChatModel;
+import dev.langchain4j.model.openai.OpenAiChatModel;
 import dev.langchain4j.model.output.Response;
 import okhttp3.OkHttpClient;
 import org.slf4j.Logger;
@@ -15,6 +17,8 @@ import retrofit2.Retrofit;
 import java.lang.reflect.Field;
 import java.lang.reflect.Proxy;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 
 @Configuration
 public class LangChain4jConfig {
@@ -25,55 +29,161 @@ public class LangChain4jConfig {
     private String geminiApiKey;
 
     @Value("${agentic.model.model-name:gemini-3.5-flash}")
-    private String modelName;
+    private String primaryModelName;
 
     @Value("${agentic.model.fallback-model-name:gemini-2.5-flash}")
-    private String fallbackModelName;
+    private String secondaryModelName;
+
+    @Value("${agentic.model.groq-api-key:${GROQ_API_KEY:}}")
+    private String groqApiKey;
+
+    @Value("${agentic.model.openrouter-api-key:${OPENROUTER_API_KEY:}}")
+    private String openrouterApiKey;
+
+    @Value("${agentic.model.deepseek-api-key:${DEEPSEEK_API_KEY:}}")
+    private String deepseekApiKey;
+
+    @Value("${agentic.model.local-base-url:${LOCAL_LLM_BASE_URL:}}")
+    private String localLlmBaseUrl;
+
+    @Value("${agentic.model.local-model-name:${LOCAL_LLM_MODEL_NAME:qwen2.5-coder-14b-instruct}}")
+    private String localModelName;
+
+    public record NamedModel(String displayName, ChatLanguageModel model) {}
 
     @Bean
     public ChatLanguageModel chatLanguageModel() {
+        List<NamedModel> chain = new ArrayList<>();
+
+        // Tier 1 - 6: Google Gemini / Gemma Models via GEMINI_API_KEY
         if (geminiApiKey != null && !geminiApiKey.isBlank()) {
-            log.info("Configuring LangChain4j Google AI Gemini with primary model: {}, fallback model: {}",
-                    modelName, fallbackModelName);
+            List<String> geminiModels = List.of(
+                    primaryModelName != null && !primaryModelName.isBlank() ? primaryModelName : "gemini-3.5-flash",
+                    "gemini-3.6-flash",
+                    secondaryModelName != null && !secondaryModelName.isBlank() ? secondaryModelName : "gemini-2.5-flash",
+                    "gemini-3.5-flash-lite",
+                    "gemini-3-flash-preview",
+                    "gemma-4-26b-a4b-it"
+            );
 
-            ChatLanguageModel primaryModel = fixModelTimeout(GoogleAiGeminiChatModel.builder()
-                    .apiKey(geminiApiKey)
-                    .modelName(modelName)
-                    .temperature(0.2)
-                    .maxOutputTokens(4096)
-                    .build(), Duration.ofSeconds(60));
+            for (String m : geminiModels) {
+                try {
+                    ChatLanguageModel geminiModel = fixModelTimeout(GoogleAiGeminiChatModel.builder()
+                            .apiKey(geminiApiKey)
+                            .modelName(m)
+                            .temperature(0.2)
+                            .maxOutputTokens(4096)
+                            .build(), Duration.ofSeconds(60));
+                    chain.add(new NamedModel("Gemini [" + m + "]", geminiModel));
+                } catch (Exception e) {
+                    log.warn("Could not register Gemini model {}: {}", m, e.getMessage());
+                }
+            }
+        }
 
-            ChatLanguageModel fallbackModel = fixModelTimeout(GoogleAiGeminiChatModel.builder()
-                    .apiKey(geminiApiKey)
-                    .modelName(fallbackModelName)
-                    .temperature(0.2)
-                    .maxOutputTokens(4096)
-                    .build(), Duration.ofSeconds(60));
+        // Tier 7: Groq Free Cloud (Llama 3.3 70B)
+        if (groqApiKey != null && !groqApiKey.isBlank()) {
+            try {
+                ChatLanguageModel groqModel = OpenAiChatModel.builder()
+                        .baseUrl("https://api.groq.com/openai/v1")
+                        .apiKey(groqApiKey)
+                        .modelName("llama-3.3-70b-versatile")
+                        .temperature(0.2)
+                        .maxTokens(4096)
+                        .timeout(Duration.ofSeconds(60))
+                        .build();
+                chain.add(new NamedModel("Groq [llama-3.3-70b-versatile]", groqModel));
+            } catch (Exception e) {
+                log.warn("Could not register Groq model: {}", e.getMessage());
+            }
+        }
 
-            return new ChatLanguageModel() {
-                @Override
-                public dev.langchain4j.model.output.Response<dev.langchain4j.data.message.AiMessage> generate(
-                        java.util.List<dev.langchain4j.data.message.ChatMessage> messages) {
+        // Tier 8: OpenRouter Free Models (DeepSeek R1 / Llama / Qwen)
+        if (openrouterApiKey != null && !openrouterApiKey.isBlank()) {
+            try {
+                ChatLanguageModel openRouterModel = OpenAiChatModel.builder()
+                        .baseUrl("https://openrouter.ai/api/v1")
+                        .apiKey(openrouterApiKey)
+                        .modelName("deepseek/deepseek-r1:free")
+                        .temperature(0.2)
+                        .maxTokens(4096)
+                        .timeout(Duration.ofSeconds(60))
+                        .build();
+                chain.add(new NamedModel("OpenRouter [deepseek-r1:free]", openRouterModel));
+            } catch (Exception e) {
+                log.warn("Could not register OpenRouter model: {}", e.getMessage());
+            }
+        }
+
+        // Tier 9: DeepSeek Direct API
+        if (deepseekApiKey != null && !deepseekApiKey.isBlank()) {
+            try {
+                ChatLanguageModel deepseekModel = OpenAiChatModel.builder()
+                        .baseUrl("https://api.deepseek.com/v1")
+                        .apiKey(deepseekApiKey)
+                        .modelName("deepseek-chat")
+                        .temperature(0.2)
+                        .maxTokens(4096)
+                        .timeout(Duration.ofSeconds(60))
+                        .build();
+                chain.add(new NamedModel("DeepSeek [deepseek-chat]", deepseekModel));
+            } catch (Exception e) {
+                log.warn("Could not register DeepSeek model: {}", e.getMessage());
+            }
+        }
+
+        // Tier 10: Local Jan.ai / Ollama / LM Studio (OpenAI-Compatible)
+        if (localLlmBaseUrl != null && !localLlmBaseUrl.isBlank() && !localLlmBaseUrl.contains("not-needed")) {
+            try {
+                ChatLanguageModel localModel = OpenAiChatModel.builder()
+                        .baseUrl(localLlmBaseUrl)
+                        .apiKey("not-needed")
+                        .modelName(localModelName != null && !localModelName.isBlank() ? localModelName : "qwen2.5-coder-14b-instruct")
+                        .temperature(0.2)
+                        .maxTokens(4096)
+                        .timeout(Duration.ofSeconds(60))
+                        .build();
+                chain.add(new NamedModel("Local LLM [" + localModelName + " @ " + localLlmBaseUrl + "]", localModel));
+            } catch (Exception e) {
+                log.warn("Could not register Local LLM model: {}", e.getMessage());
+            }
+        }
+
+        if (chain.isEmpty()) {
+            log.warn("No LLM API keys configured. Using rich deterministic domain fallback for all phases.");
+            return messages -> {
+                throw new IllegalStateException("No active LLM providers configured. Triggering rich deterministic domain fallback.");
+            };
+        }
+
+        log.info("Registered {} sequential LLM fallback candidate models: {}",
+                chain.size(), chain.stream().map(NamedModel::displayName).toList());
+
+        return new ChatLanguageModel() {
+            @Override
+            public Response<AiMessage> generate(List<ChatMessage> messages) {
+                for (int i = 0; i < chain.size(); i++) {
+                    NamedModel entry = chain.get(i);
                     try {
-                        log.info("Attempting LLM inference with Primary Model: {}", modelName);
-                        Response<dev.langchain4j.data.message.AiMessage> res = primaryModel.generate(messages);
-                        log.info("Primary Model ({}) responded successfully!", modelName);
-                        return res;
+                        log.info("[SEQUENTIAL LLM CHAIN Step {}/{}] Attempting inference with: {}",
+                                i + 1, chain.size(), entry.displayName());
+                        long start = System.currentTimeMillis();
+                        Response<AiMessage> response = entry.model().generate(messages);
+                        long dur = System.currentTimeMillis() - start;
+
+                        if (response != null && response.content() != null && !response.content().text().isBlank()) {
+                            log.info("[SEQUENTIAL LLM CHAIN Step {}/{}] {} responded successfully in {}ms!",
+                                    i + 1, chain.size(), entry.displayName(), dur);
+                            return response;
+                        }
                     } catch (Exception ex) {
-                        log.warn("Primary model ({}) failed or returned error (e.g. 503/timeout): {}. Automatically switching to fallback model ({}) and retrying...",
-                                modelName, ex.getMessage(), fallbackModelName);
-                        Response<dev.langchain4j.data.message.AiMessage> fallbackRes = fallbackModel.generate(messages);
-                        log.info("Fallback Model ({}) responded successfully!", fallbackModelName);
-                        return fallbackRes;
+                        log.warn("[SEQUENTIAL LLM CHAIN Step {}/{}] {} failed or returned error ({}). Stepping sequentially to next candidate...",
+                                i + 1, chain.size(), entry.displayName(), ex.getMessage());
                     }
                 }
-            };
-        } else {
-            log.warn("GEMINI_API_KEY is not set. Falling back to local Mock ChatLanguageModel.");
-            return (messages) -> dev.langchain4j.model.output.Response.from(
-                    dev.langchain4j.data.message.AiMessage.from(
-                            "Autonomous Agent Evaluation Completed: Analysis verified against architecture guidelines. [MOCK_OUTPUT]"));
-        }
+                throw new IllegalStateException("All " + chain.size() + " sequential LLM candidate models failed or unavailable. Falling back to deterministic domain template.");
+            }
+        };
     }
 
     /**
@@ -111,4 +221,3 @@ public class LangChain4jConfig {
         return model;
     }
 }
-

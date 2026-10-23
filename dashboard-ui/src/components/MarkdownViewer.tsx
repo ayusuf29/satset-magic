@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { Copy, Check, Eye, Code, FileText, AlertCircle, Info, ShieldAlert, Sparkles } from "lucide-react";
+import { MermaidDiagram } from "./MermaidDiagram";
 
 interface MarkdownViewerProps {
   content: string;
@@ -93,6 +94,14 @@ function renderMarkdownSections(
       i++; // skip closing ```
       const blockContent = codeLines.join("\n");
       const blockId = `code-${i}-${lang}`;
+
+      // Render interactive visual diagram if language is mermaid
+      if (lang.toLowerCase() === "mermaid") {
+        elements.push(
+          <MermaidDiagram key={blockId} chart={blockContent} id={blockId} />
+        );
+        continue;
+      }
 
       elements.push(
         <div key={blockId} className="my-3 rounded-xl border border-slate-800 bg-slate-950/90 overflow-hidden shadow-lg">

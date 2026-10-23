@@ -133,6 +133,15 @@ public class Phase1ArchitectureDesignAgent implements PhaseAgentHandler {
                     %s
                     %s
 
+                    CRITICAL ARCHITECTURAL & MERMAID DIRECTIVES:
+                    - You MUST use valid Mermaid `graph TD` syntax with subgraphs (e.g. InboundAdapters, DomainCore, OutboundAdapters, Infrastructure).
+                    - Do NOT use unclosed custom C4 macros like C4Container or C4Component; use standard Mermaid `graph TD` nodes e.g. NodeId["Node Label (Tech)"].
+                    - You MUST close every code fence with ```.
+                    - You MUST generate all 3 numbered sections completely without truncation:
+                      1. C4 Component Diagram (Mermaid)
+                      2. Bounded Contexts & Domain Invariants
+                      3. Inbound & Outbound Ports Specification
+
                     Format the output strictly as Markdown:
                     # C4 Architecture Model (Phase 1 Output)
                     **Project ID:** %s
@@ -143,10 +152,7 @@ public class Phase1ArchitectureDesignAgent implements PhaseAgentHandler {
                     ---
 
                     ## 1. C4 Component Diagram
-                    ```mermaid
-                    graph TD
-                    (Define User, Next.js Frontend, Spring Boot REST Controller, Inbound Port, Domain Service, Outbound Port, PostgreSQL, and Redis)
-                    ```
+                    (Provide full ```mermaid graph TD diagram showing User, Frontend, Inbound Adapters, Inbound Ports, Domain Core, Outbound Ports, and Outbound Adapters)
 
                     ## 2. Bounded Contexts & Domain Invariants
                     (Outline domain boundaries, aggregates, and value objects)
@@ -173,6 +179,12 @@ public class Phase1ArchitectureDesignAgent implements PhaseAgentHandler {
                 content = buildFallbackC4Model(projectId, taskName, description);
             }
 
+            if (isInvalidC4ModelOutput(content)) {
+                log.warn("LLM C4 Model produced insufficient, truncated, or unclosed content. Falling back to rich domain template.");
+                content = buildFallbackC4Model(projectId, taskName, description);
+                isFallback = true;
+            }
+
             String auditTrace = String.format("""
 
                     ---
@@ -188,7 +200,7 @@ public class Phase1ArchitectureDesignAgent implements PhaseAgentHandler {
                     duration,
                     isFallback ? "FALLBACK_DRAFT" : "LLM_GENERATED");
 
-            Files.writeString(filePath, content + auditTrace);
+            Files.writeString(filePath, content.stripTrailing() + "\n" + auditTrace);
             log.info("Successfully generated C4_MODEL.md for project: {}", projectId);
 
             journalService.recordPromptAndInference(
@@ -266,6 +278,12 @@ public class Phase1ArchitectureDesignAgent implements PhaseAgentHandler {
                 content = buildFallbackArchitectureAudit(projectId, taskName, description);
             }
 
+            if (content == null || content.isBlank() || content.lines().count() < 10 || content.contains("[MOCK_OUTPUT]")) {
+                log.warn("LLM Architecture audit produced insufficient content or mock output, falling back to rich domain template.");
+                content = buildFallbackArchitectureAudit(projectId, taskName, description);
+                isFallback = true;
+            }
+
             Files.writeString(filePath, content);
             log.info("Successfully generated phase1-architecture-audit.md for project: {}", projectId);
 
@@ -313,6 +331,34 @@ public class Phase1ArchitectureDesignAgent implements PhaseAgentHandler {
                 - **Inbound Port:** `ManageDomainUseCase` providing idempotent operation handlers.
                 - **Outbound Port:** `DomainRepositoryPort` abstracting JPA/Hibernate persistence.
                 """, projectId, taskName, taskName);
+    }
+
+    private boolean isInvalidC4ModelOutput(String content) {
+        if (content == null || content.isBlank() || content.contains("[MOCK_OUTPUT]")) {
+            return true;
+        }
+        if (content.lines().count() < 12) {
+            return true;
+        }
+        // Check for unbalanced / unclosed code fences (e.g. unclosed ```mermaid)
+        int fenceCount = 0;
+        int idx = 0;
+        while ((idx = content.indexOf("```", idx)) != -1) {
+            fenceCount++;
+            idx += 3;
+        }
+        if (fenceCount % 2 != 0) {
+            log.warn("Detected unclosed code block (fence count: {}) in generated C4 Model.", fenceCount);
+            return true;
+        }
+        // Must contain Mermaid diagram and structural domain/port sections
+        boolean hasMermaid = content.contains("```mermaid");
+        boolean hasDomainOrPorts = content.contains("Bounded Context") || content.contains("Port") || content.contains("Domain");
+        if (!hasMermaid || !hasDomainOrPorts) {
+            log.warn("C4 Model is missing required diagram or ports/domain specification.");
+            return true;
+        }
+        return false;
     }
 
     private String buildFallbackArchitectureAudit(String projectId, String taskName, String description) {

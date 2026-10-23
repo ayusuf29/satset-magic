@@ -176,6 +176,12 @@ public class Phase8ProductionGateAgent implements PhaseAgentHandler {
                 content = buildFallbackProductionReadiness(projectId, taskName, description);
             }
 
+            if (content == null || content.isBlank() || content.lines().count() < 5 || content.contains("[MOCK_OUTPUT]")) {
+                log.warn("LLM Phase 8 readiness produced insufficient content or mock output, falling back to rich domain template.");
+                content = buildFallbackProductionReadiness(projectId, taskName, description);
+                isFallback = true;
+            }
+
             String auditTrace = String.format("""
 
                     ---

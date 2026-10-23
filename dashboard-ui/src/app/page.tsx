@@ -16,6 +16,7 @@ import { TeamTopologyArtifactsExplorer } from "@/components/TeamTopologyArtifact
 import { DashboardSummaryKPIs, ProjectFilterStatus } from "@/components/DashboardSummaryKPIs";
 import { ProjectWorkflowTable } from "@/components/ProjectWorkflowTable";
 import { HitlAuditTrailCard } from "@/components/HitlAuditTrailCard";
+import { ProjectRuntimeControl } from "@/components/ProjectRuntimeControl";
 import { useLanguage } from "@/lib/i18n";
 import {
   Play,
@@ -174,6 +175,11 @@ export default function DashboardPage() {
                   currentState={selectedWorkflow.currentState}
                   reviewLoopCount={selectedWorkflow.reviewLoopCount}
                   coveragePercentage={selectedWorkflow.coveragePercentage}
+                />
+
+                {/* Autonomous Container Runtime Control (Option B) */}
+                <ProjectRuntimeControl
+                  projectId={selectedWorkflow.projectId || selectedWorkflow.id}
                 />
 
                 {/* Council Triad Governance Widget */}

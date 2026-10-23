@@ -96,7 +96,7 @@ class WorkflowControllerTest {
                 .lastDecision("APPROVED")
                 .build();
 
-        when(orchestratorService.handleHumanDecision(eq("wf-app-1"), eq("APPROVE"), anyString(), anyString()))
+        when(orchestratorService.handleHumanDecision(eq("wf-app-1"), eq("APPROVE"), anyString(), anyString(), isNull()))
                 .thenReturn(instance);
 
         mockMvc.perform(post("/api/workflow/wf-app-1/approve")
